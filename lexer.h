@@ -12,8 +12,8 @@ typedef struct {
   
   char c;
   
-  const char *f;
-  size_t l;
+  /* const char *f; */
+  /* size_t l; */
 } Lexer;
 
 TARE_DEF bool is_digit(char c);
