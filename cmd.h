@@ -30,7 +30,7 @@ typedef struct {
   int *fderr;
 } Redirect;
 
-TARE_DEF void display_cmd(Cmd *cmd);
+TARE_DEF void display_cmd(const Cmd *cmd);
 TARE_DEF bool run_cmd(Cmd *cmd, Redirect redirect, bool display);
 TARE_DEF bool run_cmd_(Cmd *cmd, Redirect redirect, bool display);
 
@@ -38,7 +38,7 @@ TARE_DEF bool run_cmd_(Cmd *cmd, Redirect redirect, bool display);
 
 #ifdef CMD_IMPLEMENTATION
 
-TARE_DEF void display_cmd(Cmd *cmd) {
+TARE_DEF void display_cmd(const Cmd *cmd) {
   printf("[CMD] ");
   for (size_t i = 0; i < cmd->count; i++) {
     const char *command = cmd->items[i];
