@@ -1,0 +1,46 @@
+func main: {
+  // r8 // work with characters
+  a(72); // set the first character to H
+  n(); // move to the next character
+  a(101); // set the first character to e
+  n(); // move to the next character
+  a(108); // set the first character to l
+  n(); // move to the next character
+  a(108); // set the first character to l
+  n(); // move to the next character
+  a(111); // set the first character to o
+  n(); // move to the next character
+  a(44); // set the first character to ,
+  n(); // move to the next character
+  a(32); // set the first character to a space
+  n(); // move to the next character
+  a(116); // set the first character to t
+  n(); // move to the next character
+  a(97); // set the first character to a
+  n(); // move to the next character
+  a(114); // set the first character to r
+  n(); // move to the next character
+  a(101); // set the first character to e
+  n(); // move to the next character
+  a(33); // set the first character to an exclamation mark
+  n(); // move to the next character
+  a(10); // set the first character to a new line
+  write(base, 13); // print from the beginning
+  ret;
+}
+
+// H = 72
+// e = 101
+// l = 108
+// l = 108
+// o = 111
+// , = 44
+//   = 32
+// t = 116
+// a = 97
+// r = 114
+// e = 101
+// ! = 33
+// 
+//  = 10
+

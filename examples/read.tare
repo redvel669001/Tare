@@ -1,0 +1,10 @@
+func main: {
+  r8
+  
+  read(base, 100);
+  f(99);
+  n();
+  a(10);
+  write(base, 101);
+  ret;
+}

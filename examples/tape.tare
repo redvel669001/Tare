@@ -1,0 +1,38 @@
+// r16
+// a 10
+// n
+// a 10
+// n a 2
+// write 0 tape
+
+// r32
+// a 10 n
+// a 10 n
+// a 10 n
+// a 4
+// f tape
+// a 10
+// p a 10
+// a tape
+// a tape
+// p a 10
+// p a 6
+// n n n n n n n n a 10 n a 10
+// write 0 20
+
+func main: {
+  r32
+  a(2);
+  f(tape);
+  a(10);
+  p();
+  a(10);
+  a(tape);
+  a(tape);
+  a(tape);
+  p();
+  a(8);
+  write(base, 3);
+  ret;
+}
+

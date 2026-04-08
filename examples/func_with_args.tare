@@ -1,0 +1,20 @@
+func main => (u64 exit_code): {
+  add_(1, 2);
+  exit_code = 3;
+  exit(14);
+  ret;
+}
+
+func exit(u64 exit_code): {
+  syscall(60, exit_code);
+  ret;
+}
+
+func add_(u64 x1, u64 x2) => (u64 x3): {
+  push(tape);
+  a(x1);
+  a(x2);
+  x3 = tape;
+  pop(tape);
+  ret;
+}

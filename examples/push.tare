@@ -1,0 +1,21 @@
+func main: {
+  a(10);
+  n();
+  a(50);
+  n();
+  a(60);
+  n();
+  a(70);
+  n();
+  a(60);
+  n();
+  a(50);
+  n();
+  // a(10);
+  // n();
+  push(10);
+  pop(tape);
+  n();
+  write(base, index);
+  ret;
+}

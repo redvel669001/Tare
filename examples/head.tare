@@ -1,0 +1,20 @@
+func main: {
+  r16
+  
+  a(10);
+  n();
+  a(40);
+  n();
+  a(43);
+  n();
+  a(41);
+  n();
+  a(10);
+  f(index);
+  a(10);
+  
+  b(index);
+  
+  write(head, 5);
+  ret;
+}

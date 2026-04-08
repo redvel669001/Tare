@@ -1,0 +1,12 @@
+func main: {
+  a(10);
+  if(tape): {
+    n();
+    a(69);
+  }
+  //end
+  n();
+  a(10);
+  write(base, 3);
+  ret;
+}

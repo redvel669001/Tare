@@ -1,0 +1,26 @@
+
+func test: {
+  write(head, 1);
+  i(); i();
+  ret;
+}
+
+func another: {
+  write(head, 1);
+  ret;
+}
+
+func main: {
+  r64
+  i();
+  while(tape): {
+  r16
+  n(); test n(); test n(); test b(3); r64 i(); test
+  }
+  // end
+
+  n();
+  a(10); write(head, 1);
+  ret;
+}
+

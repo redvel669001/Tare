@@ -1,0 +1,22 @@
+func main => (u64 exit_code,): {
+  test();
+  a(10);
+  n();
+  a(69);
+  n();
+  a(32);
+  n();
+  a(69);
+  n();
+  a(33);
+  n();
+  a(10);
+  n();
+  write(base, index);
+  ret;
+}
+
+func test => (u64 value,): {
+  value = 53;
+  ret;
+}

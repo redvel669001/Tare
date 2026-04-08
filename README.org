@@ -1,0 +1,16 @@
+#+author: RedVel
+#+name: README
+#+description: Some details about this repo.
+
+* Build
+TBD
+
+* How to Use
+TBD
+
+* Credits
+** Fasm
+This project wouldn't have been very possible without fasm (https://flatassembler.net/), both in generating assembly and in examining the binary translation of various instructions.
+** Nob
+While not used directly as the build system for this project, some code from nob.h has been copied, generally in simplified form, mainly macros.
+Nob repo: https://github.com/tsoding/nob.h/blob/main/nob.h

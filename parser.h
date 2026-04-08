@@ -1,0 +1,776 @@
+#ifndef PARSER_H_
+#define PARSER_H_
+
+typedef struct Operation Operation;
+
+typedef struct {
+  StringView name;
+  size_t vid;
+  size_t tid;
+} Var;
+
+typedef struct {
+  Var *items;
+  size_t count;
+  size_t capacity;
+} Vars;
+
+typedef struct {
+  StringView name;
+  Token *first;
+  
+  Vars args;
+  Vars rets;
+  
+  size_t start;
+  size_t end;
+} Func;
+
+typedef struct {
+  Func *items;
+  size_t count;
+  size_t capacity;
+} Funcs;
+
+typedef enum {
+  OP_PTR_ADD = 0,
+  OP_PTR_SUB,
+  OP_ELEM_ADD,
+  OP_ELEM_SUB,
+  OP_READ_SIZE,
+  OP_CONDITIONAL,
+  OP_GOTO,
+  OP_FUNCALL,
+  OP_RET,
+  OP_WRITE,
+  OP_READ,
+  OP_SYSCALL,
+  
+  OP_TAPE,
+  OP_HEAD,
+  OP_BASE,
+  OP_INDEX,
+  OP_CONST,
+
+  OP_PUSH,
+  OP_POP,
+
+  OP_ADD,
+  OP_SUB,
+  OP_MUL,
+  OP_DIV,
+  OP_SHL,
+  OP_SHR,
+  OP_DEREF,
+
+  OP_ARG,
+  OP_NUM,
+  
+  OP_TYPES,
+} OpType;
+
+struct Operation {
+  Token *start;
+  OpType type;
+  Operation *args;
+  size_t args_count;
+  size_t op;
+  StringView name;
+};
+
+typedef struct {
+  Operation *items;
+  size_t count;
+  size_t capacity;
+  StringView name;
+} Function;
+
+typedef struct {
+  Function *items;
+  size_t count;
+  size_t capacity;
+} Functions;
+
+typedef struct {
+  size_t *items;
+  size_t count;
+  size_t capacity;
+} Longs;
+
+typedef struct {
+  Tokenizer *t;
+  Functions *funcs;
+  Function *func;
+  Funcs *fns;
+  Longs *gotos;
+} Parser;
+
+TARE_DEF bool parse_file(Parser *p);
+TARE_DEF StringView sv_from_token(const Token *t);
+
+TARE_DEF bool parse_token_as_op(Parser *p);
+
+/* TARE_DEF bool parse_name_as_op(Parser *p); */
+/* TARE_DEF bool parse_whole_num_as_op(Parser *p); */
+/* TARE_DEF bool parse_frac_num_as_op(Parser *p); */
+TARE_DEF bool parse_keyword_as_op(Parser *p);
+/* TARE_DEF bool parse_special_as_op(Parser *p); */
+/* TARE_DEF bool parse_string_as_op(Parser *p); */
+/* TARE_DEF bool parse_char_as_op(Parser *p); */
+/* TARE_DEF bool parse_vid_as_op(Parser *p); */
+/* TARE_DEF bool parse_tid_as_op(Parser *p); */
+TARE_DEF bool parse_fid_as_op(Parser *p);
+/* TARE_DEF bool parse_token_types_as_op(Parser *p); */
+
+TARE_DEF bool parse_func_sig(Parser *p);
+
+TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
+TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns);
+TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns);
+TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args);
+TARE_DEF bool patch_tokenizer_rets(Tokenizer *t, Funcs *fns);
+TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t);
+
+TARE_DEF const char *op_type_as_string(OpType type); // For debugging.
+TARE_DEF void print_function(const Tokenizer *t, const Function *func);
+TARE_DEF void print_functions(const Parser *p);
+
+#endif // PARSER_H_
+
+#ifdef PARSER_IMPLEMENTATION
+
+TARE_DEF bool parse_file(Parser *p) {
+  if (p == NULL) return false;
+  
+  Tokenizer *t = p->t;
+  if (!first_token(t)) return false;
+
+  patch_tokenizer_builtin_types(t);
+  if (!patch_tokenizer_bgn_end(t)) return false;
+  
+  Funcs fns = {0};
+  Func main = {.name = SV_MAKE(main)};
+  da_append(&fns, main);
+  if (!patch_tokenizer_funcs(t, &fns)) return false;
+
+  for (size_t i = 0; i < fns.count; i++) da_append(p->funcs, (Function) {0});
+
+  p->func = p->funcs->items;
+  p->fns = &fns;
+  
+  while (true) {
+    if (!parse_token_as_op(p)) return false;
+    if (!next_token(t)) break;
+  }
+
+  bool debug = false;
+  if (debug) print_functions(p);
+
+  // For reference for later, when these things get freed in the
+  // proper place. The parser is still in its early stages, so this
+  // can wait.
+  
+  /* // Free fns */
+  /* for (size_t i = 0 ; i < fns.count; i++) { */
+  /*   Func fn = fns.items[i]; */
+  /*   if (fn.args.items) free(fn.args.items); */
+  /*   if (fn.rets.items) free(fn.rets.items); */
+  /* } */
+
+  /* if (fns.items) free(fns.items); */
+  
+  /* // Free funcs */
+  /* for (size_t i = 0 ; i < funcs->count; i++) { */
+  /*   Function fn = funcs->items[i]; */
+  /*   if (fn.items) free(fn.items); */
+  /* } */
+
+  /* if (funcs->items) free(fns.items); */
+  
+  return true;
+}
+
+TARE_DEF StringView sv_from_token(const Token *t) {
+  return (StringView) {.s = t->f, .l = t->l};
+}
+
+TARE_DEF bool parse_token_as_op(Parser *p) {
+  if (p == NULL) return false;
+  
+  Tokenizer *t = p->t;
+  
+  switch (t->t->t) {
+  case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
+  case TOKEN_TYPE_WHOLE_NUM:
+    {
+      Operation op = {.start = t->t,
+                      .type = OP_NUM,
+                      .op = t->t->u64};
+      assert(p->func != NULL);
+      da_append(p->func, op);
+    }
+    return true; // maybe?
+    unimpl("TOKEN_TYPE_WHOLE_NUM"); break;
+  case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
+  case TOKEN_TYPE_KEYWORD:
+    if (!parse_keyword_as_op(p)) return false;
+    break;
+  case TOKEN_TYPE_SPECIAL:
+    break; // TODO: actually handle this
+    unimpl("TOKEN_TYPE_SPECIAL"); break;
+  case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
+  case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
+  case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
+  case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
+  case TOKEN_TYPE_FID:
+    if (!parse_fid_as_op(p)) return false;
+    break;
+    unimpl("TOKEN_TYPE_FID"); break;
+  case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
+  default: unimpl("default case in parse_token_as_op"); break;
+  }
+
+  return true;
+}
+
+/* TARE_DEF bool parse_name_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_whole_num_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_frac_num_as_op(Parser *p); */
+
+TARE_DEF bool parse_keyword_as_op(Parser *p) {
+  if (p == NULL) return false;
+  
+  Tokenizer *t = p->t;
+  
+  Operation op = {.start = p->t->t};
+
+  switch (t->t->k) {
+  case KEY_F: case KEY_B:
+    if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
+    else op.type = OP_PTR_ADD;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_N: case KEY_P:
+    if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
+    else op.type = OP_PTR_ADD;
+    {
+      Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
+      da_append(p->func, operation);
+    }
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_A: case KEY_S:
+    if (t->t->k == KEY_S) op.type = OP_ELEM_SUB;
+    else op.type = OP_ELEM_ADD;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_I: case KEY_D:
+    if (t->t->k == KEY_D) op.type = OP_ELEM_SUB;
+    else op.type = OP_ELEM_ADD;
+    {
+      Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
+      da_append(p->func, operation);
+    }
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
+    op.type = OP_READ_SIZE;
+    /* op.op = t->t->k - KEY_R8 + 1; // (8, 16, 32, 64) => (1, 2, 3, 4) */
+    if (t->t->k == KEY_R8) op.op = 1;
+    else if(t->t->k == KEY_R16) op.op = 2;
+    else if(t->t->k == KEY_R32) op.op = 4;
+    else if(t->t->k == KEY_R64) op.op = 8;
+    da_append(p->func, op);
+    break;
+  case KEY_IF: unimpl("KEY_IF"); break;
+  case KEY_WHILE:
+    op.type = OP_CONDITIONAL;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, DEF)) return false;
+    if (!next_token(t)) return false;
+    if (t->t->t == TOKEN_TYPE_SPECIAL) {
+      if (t->t->s == BLK_BGN) {
+        op.op = t->t->jmp;
+      }
+    } else {
+      bool found = false;
+      for (Token *tok = t->t; tok < t->items + t->count; tok++) {
+        if (tok->t != TOKEN_TYPE_SPECIAL) continue;
+        if (tok->s == END) {
+          op.op = (size_t) (tok - t->items);
+          found = true;
+        } else if (tok->s == BLK_BGN) {
+          op.op = t->t->jmp;
+          found = true;
+        }
+        if (found) break;
+      }
+      if (!found) return false;
+    }
+    da_append(p->func, op);
+    da_append(p->gotos, op.op);
+    while (true) {
+      if (!next_token(t)) return false;
+      if (t->index == op.op) break;
+      if (!parse_token_as_op(p)) return false;
+    }
+    op.start = t->t;
+    op.type = OP_GOTO;
+    op.op = t->t->jmp;
+    da_append(p->func, op);
+    break;
+    unimpl("KEY_WHILE"); break;
+  case KEY_FUNC: if (!parse_func_sig(p)) return false; break;
+  case KEY_RET:
+    if (!expect_special(t, END)) return false;
+    op.type = OP_RET;
+    da_append(p->func, op);
+    break;
+  case KEY_WRITE:
+    op.type = OP_WRITE;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, SEP)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_READ: unimpl("KEY_READ"); break;
+  case KEY_SYSCALL: unimpl("KEY_SYSCALL"); break;
+  case KEY_TAPE:
+    op.type = OP_TAPE;
+    da_append(p->func, op);
+    break;
+  case KEY_HEAD:
+    op.type = OP_BASE;
+    da_append(p->func, op);
+    break;
+  case KEY_BASE:
+    op.type = OP_BASE;
+    da_append(p->func, op);
+    break;
+  case KEY_INDEX: unimpl("KEY_INDEX"); break;
+  case KEY_CONST: unimpl("KEY_CONST"); break;
+
+  case KEY_PUSH: unimpl("KEY_PUSH"); break;
+  case KEY_POP: unimpl("KEY_POP"); break;
+
+  case KEY_ADD: unimpl("KEY_ADD"); break;
+  case KEY_SUB: unimpl("KEY_SUB"); break;
+  case KEY_MUL: unimpl("KEY_MUL"); break;
+  case KEY_DIV: unimpl("KEY_DIV"); break;
+  case KEY_SHL: unimpl("KEY_SHL"); break;
+  case KEY_SHR: unimpl("KEY_SHR"); break;
+  case KEY_DEREF: unimpl("KEY_DEREF"); break;
+  
+  case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
+
+  default: unimpl("default case in parse_keyword_as_op"); break;
+  }
+
+  return true;
+}
+
+/* TARE_DEF bool parse_special_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_string_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_char_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_vid_as_op(Parser *p); */
+
+/* TARE_DEF bool parse_tid_as_op(Parser *p); */
+
+TARE_DEF bool parse_fid_as_op(Parser *p) {
+  if (p == NULL) return false;
+  Tokenizer *t = p->t;
+  Operation op = {.start = t->t, .type = OP_FUNCALL, .op = t->t->fid};
+  da_append(p->func, op);
+  return true;
+}
+
+/* TARE_DEF bool parse_token_types_as_op(Parser *p); */
+
+TARE_DEF bool parse_func_sig(Parser *p) {
+  Tokenizer *t = p->t;
+  if (!expect_fid(t)) return false;
+  const Token *name = t->t;
+  size_t fid = t->t->fid;
+  Func *fn = p->fns->items + fid;
+  // Should probably become more involved than this.
+  if (!to_token(t, fn->start)) return false;
+  p->func = p->funcs->items + fid;
+  p->func->name = sv_from_token(name);
+  return true;
+}
+
+TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t) {
+  for (size_t i = 0; i < TYPES_COUNT; i++) {
+    for (size_t j = 0; j < t->count; j++) {
+      Token *tok = t->items + j;
+      if (tok->t != TOKEN_TYPE_NAME) continue;
+      if (!tok_sv_cmp(tok, VariableTypes[i])) continue;
+      tok->t = TOKEN_TYPE_TID;
+      tok->tid = i;
+    }
+  }
+}
+
+TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns) {
+  if (t == NULL) return false;
+  if (fns == NULL) return false;
+  
+  size_t point = t->index;
+  if (!first_token(t)) return false;
+  
+  while (true) {
+    if (t->t->t != TOKEN_TYPE_KEYWORD) {
+      if (!next_token(t)) break;
+      continue;
+    }
+    if (t->t->k != KEY_FUNC) {
+      if (!next_token(t)) break;
+      continue;
+    }
+
+    if (!patch_tokenizer_func(t, fns)) return false;
+    if (!next_token(t)) break;
+  }
+
+  return to_token(t, point);
+}
+
+TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns) {
+  Token *first = t->t;
+  // Get the function's name.
+  if (!expect_name(t)) return false;
+  Func fn = {.name = sv_from_token(t->t), .first = first};
+  size_t fid = fns->count;
+  if (sv_eq(fn.name, fns->items[0].name)) fid = 0;
+  assert(fns->count > 0 && "please don't corrupt the memory");
+  /* da_append(fns, fn); */
+  Func *f = fns->items + fid;
+  if (fid != 0) da_append(fns, fn);
+  t->t->t = TOKEN_TYPE_FID;
+  t->t->fid = fid;
+  Token *final_token = t->items + t->count;
+  for (Token *tok = t->items; tok < final_token; tok++) {
+    if (tok->t != TOKEN_TYPE_NAME) continue;
+    if (tok_eq(t->t, tok)) {
+      tok->t = TOKEN_TYPE_FID;
+      tok->fid = fid;
+    }
+  }
+
+  size_t point = t->index;
+  bool valid_func = false;
+
+  while (next_token(t)) {
+    if (t->t->t != TOKEN_TYPE_SPECIAL) continue;
+    if (t->t->s != DEF) continue;
+    if (!expect_special(t, BLK_BGN)) return false;
+    f->start = t->index;
+    f->end = t->t->jmp;
+
+    for (size_t i = f->end; i > f->start; i--) {
+      Token *tok = t->items + i;
+      if (tok->t != TOKEN_TYPE_KEYWORD) continue;
+      if (tok->k != KEY_RET) continue;
+      valid_func = true;
+      break;
+    }
+
+    if (!valid_func) break;
+    break;
+  }
+
+  if (!to_token(t, point)) return false;
+  if (!valid_func) {
+    print_loc(stderr, t, t->t);
+    fprintf(stderr, "error: invalid function signature!\n");
+    print_loc(stdout, t, t->t);
+    fprintf(stdout, "note: a proper function signature would like one of the following four options: \n");
+    fprintf(stdout, "%*.sfunc NAME (ARGS) => (RETS): {BODY}\n", 4, "");
+    fprintf(stdout, "%*.sfunc NAME (ARGS): {BODY}\n", 4, "");
+    fprintf(stdout, "%*.sfunc NAME => (RETS): {BODY}\n", 4, "");
+    fprintf(stdout, "%*.sfunc NAME: {BODY}\n", 4, "");
+    print_loc(stdout, t, t->t);
+    fprintf(stdout, "note: while the space between `func` and `NAME` is necessary, the other whitespaces shown in this signature are unnecessary and ignored by the lexer and tokenizer.\n");
+    print_loc(stdout, t, t->t);
+    fprintf(stdout, "note: furthermore, `BODY` must include in it a `%.*s` statement.\n", SV_ARG(Keywords[KEY_RET]));
+    return false;
+  }
+  
+  bool patching_args = true;
+  /* bool patching_rets = true; */
+
+  // Check for function arguments or for return values.
+  if (!expect_special_many(t, PAR_BGN, DEF, EQUAL)) return false;
+  if (t->t->s == EQUAL) {
+    if (!expect_special(t, GREATER)) return false;
+    if (!expect_special_many(t, PAR_BGN, DEF)) return false;
+    patching_args = false;
+  }
+  
+  // Exit early if there are no arguments and no return values.
+  if (t->t->s == DEF) return true;
+
+  // Gather function arguments, if there are any.
+  if (patching_args) {
+    if (!patch_tokenizer_args(t, f, true)) return false;
+    if (!expect_special_many(t, DEF, EQUAL)) return false;
+  }
+
+  if (t->t->s == DEF) return true;
+  
+  if (patching_args) {
+    if (!expect_special(t, GREATER)) return false;
+    if (!expect_special(t, PAR_BGN)) return false;
+  }
+
+  // Gather return values, if there are any.
+  if (!patch_tokenizer_args(t, f, false)) return false;
+  if (!expect_special(t, DEF)) return false;
+
+  return true;
+}
+
+TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args) {
+  size_t vid = 0;
+  Token *end = t->items + fn->end;
+
+  while (t->t->s != PAR_END) {
+    if (!expect_tid_or_const(t)) return false;
+    if (t->t->t == TOKEN_TYPE_KEYWORD) {
+      if (t->t->k != KEY_CONST) {
+        print_loc(stderr, t, t->t);
+        fprintf(stderr, "error: tokenizer error\n");
+      }
+      if (!expect_tid(t)) return false;
+    }
+    size_t tid = t->t->tid;
+    if (!expect_name(t)) return false;
+    /* if (args) vid = fn->args.count; */
+    /* else vid = fn->rets.count; */
+    vid = fn->args.count + fn->rets.count; // TODO: make this actually work
+    
+    Var arg = {
+      .name = sv_from_token(t->t),
+      .vid = vid,
+      .tid = tid,
+    };
+      
+    for (Token *tok = t->t; tok < end; tok++) {
+      if (tok->k == KEY_RET) break;
+      if (tok->t != TOKEN_TYPE_NAME) continue;
+      if (tok_eq(t->t, tok)) {
+        tok->t = TOKEN_TYPE_VID;
+        tok->vid = arg.vid;
+      }
+    }
+
+    if (args) da_append(&fn->args, arg);
+    else da_append(&fn->rets, arg);
+
+    if (!expect_special_many(t, SEP, PAR_END)) return false;
+    if (t->t->s == SEP) {
+      Token next = peek_next_token(t);
+      if (next.t != TOKEN_TYPE_SPECIAL) continue;
+      if (next.s == PAR_END) if (!next_token(t)) return false;
+    }
+  }
+
+  return true;
+}
+
+TARE_DEF bool patch_tokenizer_rets(Tokenizer *t, Funcs *fns) {
+  if (t == NULL || fns == NULL) return false;
+  
+  for (size_t i = 0; i < fns->count; i++) {
+    Func *fn = fns->items + i;
+    for (size_t j = fn->start; j < fn->end; j++) {
+      Token *tok = t->items + j;
+      if (tok->t != TOKEN_TYPE_KEYWORD) continue;
+      if (tok->k != KEY_RET) continue;
+      tok->fid = i;
+    }
+  }
+
+  return true;
+}
+
+TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
+  Longs par = {0};
+  Longs grp = {0};
+  Longs blk = {0};
+
+  for (size_t i = 0; i < t->count; i++) {
+    Token *tok = t->items + i;
+    if (tok->t != TOKEN_TYPE_SPECIAL) continue;
+    if (tok->s == PAR_BGN) da_append(&par, i);
+    else if (tok->s == GRP_BGN) da_append(&grp, i);
+    else if (tok->s == BLK_BGN) da_append(&blk, i);
+    else if (tok->s == PAR_END) {
+      if (par.count == 0) {
+        fprintf(stderr, "%s:%zu:%zu: error: "
+                "can't close parentheses that haven't been opened.\n",
+                t->path, tok->row, tok->col);
+      }
+      size_t jmp = par.items[--par.count];
+      tok->jmp = jmp;
+      tok = t->items + jmp;
+      tok->jmp = i;
+    } else if (tok->s == GRP_END) {
+      if (grp.count == 0) {
+        fprintf(stderr, "%s:%zu:%zu: error: "
+                "can't end a group that hasn't been started.\n",
+                t->path, tok->row, tok->col);
+      }
+      size_t jmp = grp.items[--grp.count];
+      tok->jmp = jmp;
+      tok = t->items + jmp;
+      tok->jmp = i;
+    } else if (tok->s == BLK_END) {
+      if (blk.count == 0) {
+        fprintf(stderr, "%s:%zu:%zu: error: "
+                "can't close a block that hasn't been started.\n",
+                t->path, tok->row, tok->col);
+      }
+      size_t jmp = blk.items[--blk.count];
+      tok->jmp = jmp;
+      tok = t->items + jmp;
+      tok->jmp = i;
+    }
+  }
+
+  if (par.count > 0) {
+    for (size_t i = 0; i < par.count; i++) {
+      size_t jmp = par.items[i];
+      Token *tok = t->items + jmp;
+      fprintf(stderr, "%s:%zu:%zu: error: "
+              "parentheses opened but didn't close.\n",
+              t->path, tok->row, tok->col);
+    }
+  }
+
+  if (grp.count > 0) {
+    for (size_t i = 0; i < grp.count; i++) {
+      size_t jmp = grp.items[i];
+      Token *tok = t->items + jmp;
+      fprintf(stderr, "%s:%zu:%zu: error: "
+              "group started but didn't end.\n",
+              t->path, tok->row, tok->col);
+    }
+  }
+
+  if (blk.count > 0) {
+    for (size_t i = 0; i < blk.count; i++) {
+      size_t jmp = blk.items[i];
+      Token *tok = t->items + jmp;
+      fprintf(stderr, "%s:%zu:%zu: error: "
+              "block started but didn't close.\n",
+              t->path, tok->row, tok->col);
+    }
+  }
+
+  if (par.items) free(par.items);
+  if (grp.items) free(grp.items);
+  if (blk.items) free(blk.items);
+  
+  return (par.count == 0) && (grp.count == 0) && (blk.count == 0);
+}
+
+TARE_DEF const char *op_type_as_string(OpType type) {
+  switch (type) {
+  case OP_PTR_ADD: return "OP_PTR_ADD";
+  case OP_PTR_SUB: return "OP_PTR_SUB";
+  case OP_ELEM_ADD: return "OP_ELEM_ADD";
+  case OP_ELEM_SUB: return "OP_ELEM_SUB";
+  case OP_READ_SIZE: return "OP_READ_SIZE";
+  case OP_CONDITIONAL: return "OP_CONDITIONAL";
+  case OP_GOTO: return "OP_GOTO";
+  case OP_FUNCALL: return "OP_FUNCALL";
+  case OP_RET: return "OP_RET";
+  case OP_WRITE: return "OP_WRITE";
+  case OP_READ: return "OP_READ";
+  case OP_SYSCALL: return "OP_SYSCALL";
+  
+  case OP_TAPE: return "OP_TAPE";
+  case OP_HEAD: return "OP_HEAD";
+  case OP_BASE: return "OP_BASE";
+  case OP_INDEX: return "OP_INDEX";
+  case OP_CONST: return "OP_CONST";
+
+  case OP_PUSH: return "OP_PUSH";
+  case OP_POP: return "OP_POP";
+
+  case OP_ADD: return "OP_ADD";
+  case OP_SUB: return "OP_SUB";
+  case OP_MUL: return "OP_MUL";
+  case OP_DIV: return "OP_DIV";
+  case OP_SHL: return "OP_SHL";
+  case OP_SHR: return "OP_SHR";
+  case OP_DEREF: return "OP_DEREF";
+
+  case OP_ARG: return "OP_ARG";
+  case OP_NUM: return "OP_NUM";
+  
+  case OP_TYPES: return "OP_TYPES";
+  default: return "";
+  }
+}
+
+TARE_DEF void print_function(const Tokenizer *t, const Function *func) {
+  for (size_t i = 0; i < func->count; i++) {
+    Operation op = func->items[i];
+    printf("--------------------------------------------------\n");
+    debug_print_token(t, op.start);
+    printf("op (%zu) = {\n", i);
+    printf("  .start = ");
+    debug_print_token(t, op.start);
+    printf("  .type = %s\n", op_type_as_string(op.type));
+    printf("  .args = %p\n", (void*)op.args);
+    printf("  .args_count = %zu\n", op.args_count);
+    printf("  .op = %zu\n", op.op);
+    if (op.name.s != NULL) printf("  .name = %.*s\n", SV_ARG(op.name));
+    else printf("  .name = {.s = %p, .l = %zu}\n", op.name.s, op.name.l);
+    printf("}\n");
+    printf("--------------------------------------------------\n\n");
+  }
+}
+
+TARE_DEF void print_functions(const Parser *p) {
+  for (size_t i = 0; i < p->funcs->count; i++) {
+    Function *func = p->funcs->items + i;
+    printf("\n--------------------------------------------------\n");
+    printf("Function `%.*s`\n", SV_ARG(func->name));
+    print_function(p->t, func);
+    printf("\n--------------------------------------------------\n");
+  }
+}
+
+#endif // PARSER_IMPLEMENTATION

@@ -1,0 +1,20 @@
+// func test456 start
+//   write(base, 1);
+// ret
+
+func main: {
+  r8
+  
+  recursion();
+  
+  a(10); write(base, 1); // add a new line
+  
+  
+  a(10);
+  ret;
+}
+
+func recursion: {
+  write(base, 1); i(); if(tape): {recursion();} // end
+  ret;
+}

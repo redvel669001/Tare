@@ -1,0 +1,22 @@
+func main: {
+  r32
+  
+  n();
+  i();
+  
+  while(tape): {
+    p();
+    if(tape): {
+      i(); n(); i(); p();
+    //end
+    }i();
+    n(); write(base, 8);
+    if(tape): {p(); a(11117); n(); a(1); }//end
+    write(base, 8);
+  //end
+  }
+  
+  a(10);
+  write(base, 8);
+  ret;
+}

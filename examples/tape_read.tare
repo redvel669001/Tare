@@ -1,0 +1,35 @@
+func main: {
+  a(10);
+  n();
+  a(10);
+  a(tape);
+  a(tape);
+  a(tape);
+  n();
+  a(10);
+  n();
+  a(base);
+  write(tape, 3);
+  
+  f(10);
+  
+  a(10);
+  n();
+  a(10);
+  a(tape);
+  a(tape);
+  a(tape);
+  n();
+  a(10);
+  n();
+  a(3);
+  b(3);
+  write(head, tape);
+  
+  
+  // f(10);
+  // a(20);
+  // a(base);
+  // write(tape, tape);
+  ret;
+}

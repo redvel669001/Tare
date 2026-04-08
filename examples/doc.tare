@@ -1,0 +1,19 @@
+f 10 // forward - moves the tape forward, takes an operand
+b 10 // backward - moves the tape forwad, takes an operand
+
+n // next - moves the tape forwad by one byte, doesn't take an operand
+p // previous - moves the tape backward by one byte, doesn't take an operand
+
+a 10 // add - adds to the current value the tape is pointing at, takes an operand
+s 10 // sub - subtracts from the current value the tape is pointing at, takes an operand
+
+i // inc - adds one to the value the tape is pointing at, , doesn't take an operand
+d // dec - subtracts one from the value the tape is pointing at, , doesn't take an operand
+
+r8 // read 8 - reads one byte to operate on, doesn't take an operand
+r16 // read 16 - reads two byte to operate on, doesn't take an operand
+r32 // read 32 - reads four byte to operate on, doesn't take an operand
+r64 // read 64 - reads eight byte to operate on, doesn't take an operand
+
+func // function - takes at least one operand, the name of the function
+

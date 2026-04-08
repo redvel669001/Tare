@@ -1,0 +1,14 @@
+func main: {
+  r8
+  write(base, 1);
+  i();
+  while(tape): {
+  i();
+  write(base, 1);
+  }
+  // end
+  a(10);
+  write(base, 1);
+  ret;
+}
+

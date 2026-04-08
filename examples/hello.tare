@@ -1,0 +1,11 @@
+func main: {
+  a(8367736964726416712); // Hello, t
+  n();
+  r32
+  a(560296545); // are!
+  n();
+  r8
+  a(10); // new line
+  write(base, 13);
+  ret;
+}

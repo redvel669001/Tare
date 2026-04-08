@@ -1,0 +1,37 @@
+func test(u64 first,) => (u64 result,): {
+  ret;
+}
+
+func print: {
+  syscall(1, 1, base, index);
+  ret;
+}
+
+func exit: {
+  syscall(60, 0);
+  ret;
+}
+
+func test2 => (u64 result): {
+  ret;
+}
+
+func main: {
+  a(10);
+  n();
+  a(69);
+  n();
+  a(32);
+  n();
+  a(69);
+  n();
+  a(10);
+  n();
+
+  print();
+
+  syscall(60, 0);
+
+  exit();
+  ret;
+}
