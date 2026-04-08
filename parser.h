@@ -40,6 +40,7 @@ typedef enum {
   OP_READ_SIZE,
   OP_CONDITIONAL,
   OP_GOTO,
+  OP_ADDRESS,
   OP_FUNCALL,
   OP_RET,
   OP_WRITE,
@@ -293,7 +294,6 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     break;
   case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
     op.type = OP_READ_SIZE;
-    /* op.op = t->t->k - KEY_R8 + 1; // (8, 16, 32, 64) => (1, 2, 3, 4) */
     if (t->t->k == KEY_R8) op.op = 1;
     else if(t->t->k == KEY_R16) op.op = 2;
     else if(t->t->k == KEY_R32) op.op = 4;
@@ -302,43 +302,52 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     break;
   case KEY_IF: unimpl("KEY_IF"); break;
   case KEY_WHILE:
-    op.type = OP_CONDITIONAL;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, DEF)) return false;
-    if (!next_token(t)) return false;
-    if (t->t->t == TOKEN_TYPE_SPECIAL) {
-      if (t->t->s == BLK_BGN) {
-        op.op = t->t->jmp;
-      }
-    } else {
-      bool found = false;
-      for (Token *tok = t->t; tok < t->items + t->count; tok++) {
-        if (tok->t != TOKEN_TYPE_SPECIAL) continue;
-        if (tok->s == END) {
-          op.op = (size_t) (tok - t->items);
-          found = true;
-        } else if (tok->s == BLK_BGN) {
-          op.op = t->t->jmp;
-          found = true;
-        }
-        if (found) break;
-      }
-      if (!found) return false;
-    }
-    da_append(p->func, op);
-    da_append(p->gotos, op.op);
-    while (true) {
+    {
+      Operation address = {.start = op.start, .type = OP_ADDRESS,
+                           .op = t->index};
+      op.type = OP_CONDITIONAL;
+      da_append(p->func, address);
+      if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
-      if (t->index == op.op) break;
       if (!parse_token_as_op(p)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      if (!expect_special(t, DEF)) return false;
+      if (!next_token(t)) return false;
+      if (t->t->t == TOKEN_TYPE_SPECIAL) {
+        if (t->t->s == BLK_BGN) {
+          op.op = t->t->jmp;
+        }
+      } else {
+        bool found = false;
+        for (Token *tok = t->t; tok < t->items + t->count; tok++) {
+          if (tok->t != TOKEN_TYPE_SPECIAL) continue;
+          if (tok->s == END) {
+            op.op = (size_t) (tok - t->items);
+            found = true;
+          } else if (tok->s == BLK_BGN) {
+            op.op = t->t->jmp;
+            found = true;
+          }
+          if (found) break;
+        }
+        if (!found) return false;
+      }
+      da_append(p->func, op);
+      da_append(p->gotos, op.op);
+      while (true) {
+        if (!next_token(t)) return false;
+        if (t->index == op.op) break;
+        if (!parse_token_as_op(p)) return false;
+      }
+      op.start = t->t;
+      op.type = OP_GOTO;
+      op.op = address.op;
+      da_append(p->func, op);
+
+      address.start = t->t;
+      address.op = t->index;
+      da_append(p->func, address);
     }
-    op.start = t->t;
-    op.type = OP_GOTO;
-    op.op = t->t->jmp;
-    da_append(p->func, op);
     break;
     unimpl("KEY_WHILE"); break;
   case KEY_FUNC: if (!parse_func_sig(p)) return false; break;
@@ -713,6 +722,7 @@ TARE_DEF const char *op_type_as_string(OpType type) {
   case OP_READ_SIZE: return "OP_READ_SIZE";
   case OP_CONDITIONAL: return "OP_CONDITIONAL";
   case OP_GOTO: return "OP_GOTO";
+  case OP_ADDRESS: return "OP_ADDRESS";
   case OP_FUNCALL: return "OP_FUNCALL";
   case OP_RET: return "OP_RET";
   case OP_WRITE: return "OP_WRITE";

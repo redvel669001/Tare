@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
   }
 
   // Temporary, for testing the WIP parser.
-  cmd_append(&cmd, "./tare", "./examples/test.tare");
+  cmd_append(&cmd, "./tare", "./examples/while.tare");
   if (!run_cmd(&cmd, redirect, true)) return 1;
   /* cmd_append(&cmd, "./build/test"); */
   /* if (!run_cmd(&cmd, redirect, true)) return 1; */

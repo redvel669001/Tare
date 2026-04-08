@@ -19,6 +19,13 @@
 #define OPS_HEAD "[rbp-88]"
 #define OPS_BASE "[rbp-96]"
 
+
+/* #define ARGS_HEAD "[rbp-40]" */
+/* #define RETS_HEAD "[rbp-48]" */
+/* #define VARS_HEAD "[rbp-56]" */
+/* #define OPS_HEAD "[rbp-64]" */
+
+
 // TODO: Make tape sizes compile-time and runtime variables.
 #define TAPE_SIZE 1024
 #define ARG_STACK_SIZE 1024
@@ -27,19 +34,19 @@
 #define OPS_STACK_SIZE 1024
   
 #define TAPE_NAME "tape"
-#define ARGS_NAME "function_arguments_stack"
-#define RETS_NAME "return_values_stack"
-#define VARS_NAME "global_variables_stack"
-#define OPS_NAME  "operations_stack"
+#define ARGS_NAME "function_arguments_tape"
+#define RETS_NAME "return_values_tape"
+#define VARS_NAME "global_variables_tape"
+#define OPS_NAME  "operations_tape"
 
 typedef struct {
-  Longs *longs;
-  Longs *gotos;
+  Longs *longs; // Numbers too big to be passed directly to registers.
+  Longs *gotos; // Current goto, e.g. in a loop.
   bool fail;
   size_t r; // current read size in bytes
   Tokenizer *t;
-  String errors;
-  Longs error_indices;
+  String errors; // Doesn't really make much sense anymore.
+  Longs error_indices; // Doesn't really make much sense anymore.
   Function *fn;
   Operation *op;
   Functions *fns;
@@ -47,7 +54,6 @@ typedef struct {
   Funcs *funcs;
 } Generator;
 
-/* TARE_DEF bool gen_fasm(Tokenizer *t, Functions *funcs, const char *output); */
 TARE_DEF bool gen_fasm(Parser *p, const char *output);
 
 TARE_DEF bool gen_func(Generator *g, FILE *f);
@@ -58,15 +64,16 @@ TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f);
 TARE_DEF void gen_elem_add_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_elem_sub_op(Generator *g, FILE *f); */
 TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r);
-/* TARE_DEF bool gen_conditional_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_goto_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_funcall_op(Generator *g, FILE *f); */
+TARE_DEF void gen_conditional_op(Generator *g, FILE *f);
+TARE_DEF void gen_goto_op(Generator *g, FILE *f);
+TARE_DEF void gen_address_op(Generator *g, FILE *f);
+TARE_DEF void gen_funcall_op(Generator *g, FILE *f);
 TARE_DEF void gen_ret_op(Generator *g, FILE *f);
 TARE_DEF void gen_write_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_read_op(Generator *g, FILE *f); */
 /* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
 
-/* TARE_DEF bool gen_tape_op(Generator *g, FILE *f); */
+TARE_DEF void gen_tape_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_head_op(Generator *g, FILE *f); */
 TARE_DEF void gen_base_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_index_op(Generator *g, FILE *f); */
@@ -88,7 +95,7 @@ TARE_DEF void gen_num_op(Generator *g, FILE *f, bool mul, bool mask);
 
 /* TARE_DEF bool gen_op_types_op(Generator *g, FILE *f); */
 
-TARE_DEF void gen_conditional_op(Generator *gen, FILE *f, bool jz);
+/* TARE_DEF void gen_conditional_op(Generator *gen, FILE *f, bool jz); */
 
 // TODO: handle these functions
 /* TARE_DEF const char *get_error_message(const Tokenizer *t, String *errors, Longs *error_indices); */
@@ -130,24 +137,24 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   fprintf(f, "start:\n");
 
   // Tare runtime
-  fprintf(f, "push " TAPE_NAME "\n");         // base
-  fprintf(f, "mov rbp, rsp\n");
-  fprintf(f, "push " TAPE_NAME "\n");         // head
-  fprintf(f, "push 8\n");            // read size in bytes (for addition)
-  fprintf(f, "push 3\n");            // read size bit shifting
-  fprintf(f, "push %zu\n", R64_MAX); // read size bit mask
-
+  fprintf(f, "push " TAPE_NAME "\n"); // base
+  fprintf(f, "mov rbp, rsp\n");       // point rbp at the right place
+  fprintf(f, "push " TAPE_NAME "\n"); // head
+  fprintf(f, "push 8\n");             // read size in bytes (for addition)
+  fprintf(f, "push 3\n");             // read size bit shifting
+  fprintf(f, "push %zu\n", R64_MAX);  // read size bit mask
+  
   fprintf(f, "push " ARGS_NAME "\n"); // args base
   fprintf(f, "push " ARGS_NAME "\n"); // args head
-
+  
   fprintf(f, "push " RETS_NAME "\n"); // rets base
   fprintf(f, "push " RETS_NAME "\n"); // rets head
   
   fprintf(f, "push " VARS_NAME "\n"); // vars base
   fprintf(f, "push " VARS_NAME "\n"); // vars head
-
-  fprintf(f, "push " OPS_NAME "\n"); // ops base
-  fprintf(f, "push " OPS_NAME "\n"); // ops head
+  
+  fprintf(f, "push " OPS_NAME "\n");  // ops base
+  fprintf(f, "push " OPS_NAME "\n");  // ops head
 
 /* #define TAPE_NAME "tape" */
 /* #define ARGS_NAME "function_arguments_stack" */
@@ -218,7 +225,6 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
 
 TARE_DEF bool gen_func(Generator *g, FILE *f) {
   if (g == NULL || f == NULL) return false;
-  /* Tokenizer *t = g->t; */
 
   Func *fn = g->funcs->items + g->fni;
   fprintf(f, ";; --------------------------------------------------\n");
@@ -241,21 +247,29 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   Operation *op = g->op;
   t->t = op->start;
 
+  fprintf(f, ";; %.*s\n", TOK_ARG(op->start));
+
   switch (op->type) {
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
   case OP_PTR_SUB: unimpl("OP_PTR_SUB"); break;
   case OP_ELEM_ADD: gen_elem_add_op(g, f); break;
   case OP_ELEM_SUB: unimpl("OP_ELEM_SUB"); break;
   case OP_READ_SIZE: if (!gen_read_size_op(g, f, op->op)) return false; break;
-  case OP_CONDITIONAL: unimpl("OP_CONDITIONAL"); break;
-  case OP_GOTO: unimpl("OP_GOTO"); break;
-  case OP_FUNCALL: unimpl("OP_FUNCALL"); break;
+  case OP_CONDITIONAL: gen_conditional_op(g, f); break;
+    unimpl("OP_CONDITIONAL"); break;
+  case OP_GOTO: gen_goto_op(g, f); break;
+    unimpl("OP_GOTO"); break;
+  case OP_ADDRESS: gen_address_op(g, f); break;
+    unimpl("OP_ADDRESS"); break;
+  case OP_FUNCALL: gen_funcall_op(g, f); break;
+    unimpl("OP_FUNCALL"); break;
   case OP_RET: gen_ret_op(g, f); break;
   case OP_WRITE: gen_write_op(g, f); break;
   case OP_READ: unimpl("OP_READ"); break;
   case OP_SYSCALL: unimpl("OP_SYSCALL"); break;
   
-  case OP_TAPE: unimpl("OP_TAPE"); break;
+  case OP_TAPE: gen_tape_op(g, f); break;
+    unimpl("OP_TAPE"); break;
   case OP_HEAD: unimpl("OP_HEAD"); break;
   case OP_BASE: gen_base_op(g, f); break;
   case OP_INDEX: unimpl("OP_INDEX"); break;
@@ -336,11 +350,34 @@ TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r) {
   return true;
 }
 
-/* TARE_DEF bool gen_conditional_op(Generator *g, FILE *f); */
+TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
 
-/* TARE_DEF bool gen_goto_op(Generator *g, FILE *f); */
+  fprintf(f, "cmp QWORD rax, 0\n");
+  fprintf(f, "jz addr_%zu\n", g->op->op);
+  
+  /* Operation *op = g->op; */
+  /* if (jz) fprintf(f, "jz addr_%zu\n", op->op); */
+  /* else fprintf(f, "jnz addr_%zu\n", op->op); */
+  
+  (void)g;
+}
 
-/* TARE_DEF bool gen_funcall_op(Generator *g, FILE *f); */
+TARE_DEF void gen_goto_op(Generator *g, FILE *f) {
+  fprintf(f, "jmp addr_%zu\n", g->op->op);
+}
+
+TARE_DEF void gen_address_op(Generator *g, FILE *f) {
+  fprintf(f, "addr_%zu:\n", g->op->op);
+}
+
+TARE_DEF void gen_funcall_op(Generator *g, FILE *f) {
+  // TODO: handle this properly
+  fprintf(f, "call func_%zu\n", g->op->op);
+}
 
 TARE_DEF void gen_ret_op(Generator *g, FILE *f) {
   fprintf(f, "ret\n");
@@ -372,7 +409,17 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
 
 /* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
 
-/* TARE_DEF bool gen_tape_op(Generator *g, FILE *f); */
+TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
+  fprintf(f, "mov QWORD rax, QWORD " TAPE_BASE "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rax]\n");
+  /* fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n"); */
+  
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+
+  (void)g;
+}
 
 /* TARE_DEF bool gen_head_op(Generator *g, FILE *f); */
 
@@ -451,21 +498,21 @@ TARE_DEF void gen_num_op(Generator *g, FILE *f, bool mul, bool mask) {
   /* fprintf(f, "push QWORD rax\n"); */
 }
 
-TARE_DEF void gen_conditional_op(Generator *gen, FILE *f, bool jz) {
-  fprintf(f, "mov QWORD rax, QWORD [rsi]\n");
-  switch (gen->r) {
-  case 1: fprintf(f, "test BYTE al, BYTE al\n"); break;
-  case 2: fprintf(f, "test WORD ax, WORD ax\n"); break;
-  case 4: fprintf(f, "test DWORD eax, DWORD eax\n"); break;
-  case 8: fprintf(f, "test QWORD rax, QWORD rax\n"); break;
-  default:
-    print_loc(stderr, gen->t, gen->t->t);
-    fprintf(stderr, "error: Invalid read size!\n");
-    break;
-  }
-  if (jz) fprintf(f, "jz addr_%zu\n", gen->op->args->op);
-  else fprintf(f, "jnz addr_%zu\n", gen->op->args->op);
-}
+/* TARE_DEF void gen_conditional_op(Generator *gen, FILE *f, bool jz) { */
+/*   fprintf(f, "mov QWORD rax, QWORD [rsi]\n"); */
+/*   switch (gen->r) { */
+/*   case 1: fprintf(f, "test BYTE al, BYTE al\n"); break; */
+/*   case 2: fprintf(f, "test WORD ax, WORD ax\n"); break; */
+/*   case 4: fprintf(f, "test DWORD eax, DWORD eax\n"); break; */
+/*   case 8: fprintf(f, "test QWORD rax, QWORD rax\n"); break; */
+/*   default: */
+/*     print_loc(stderr, gen->t, gen->t->t); */
+/*     fprintf(stderr, "error: Invalid read size!\n"); */
+/*     break; */
+/*   } */
+/*   if (jz) fprintf(f, "jz addr_%zu\n", gen->op->args->op); */
+/*   else fprintf(f, "jnz addr_%zu\n", gen->op->args->op); */
+/* } */
 
 /* TARE_DEF const char *get_error_message(const Tokenizer *t, String *errors, Longs *error_indices) { */
 /*   switch (t->t->k) { */
