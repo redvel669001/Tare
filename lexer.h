@@ -22,8 +22,8 @@ TARE_DEF bool to_char(Lexer *l, size_t index);
 TARE_DEF bool first_char(Lexer *l);
 TARE_DEF bool next_char(Lexer *l);
 TARE_DEF bool prev_char(Lexer *l);
-TARE_DEF char peek_next_char(Lexer *l);
-TARE_DEF char peek_prev_char(Lexer *l);
+TARE_DEF char peek_next_char(const Lexer *l);
+TARE_DEF char peek_prev_char(const Lexer *l);
 
 TARE_DEF bool lexer_advance_char_forward(Lexer *l);
 
@@ -54,12 +54,12 @@ TARE_DEF bool prev_char(Lexer *l) {
   return to_char(l, l->i - 1);
 }
 
-TARE_DEF char peek_next_char(Lexer *l) {
+TARE_DEF char peek_next_char(const Lexer *l) {
   if (!check_bounds(l->i + 1, l->buf.count)) return 0;
   return l->buf.items[l->i + 1];
 }
 
-TARE_DEF char peek_prev_char(Lexer *l) {
+TARE_DEF char peek_prev_char(const Lexer *l) {
   if (!check_bounds(l->i - 1, l->buf.count)) return 0;
   return l->buf.items[l->i - 1];
 }
