@@ -662,6 +662,13 @@ TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...) {
     s = va_arg(args, SpecialType);
   }
 
+  if (success) return true;
+
+  va_end(args);
+  va_start(args, t);
+  
+  s = va_arg(args, SpecialType);
+  
   /* print_loc(stderr, t, begin); */
   /* fprintf(stderr, "error: expected "); */
   diag_err(t, begin, "expected ");
@@ -678,6 +685,8 @@ TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...) {
   }
   fprintf(stderr, "but got %s `%.*s` instead.\n",
           TokenTypeNames[t->t->t], TOK_ARG(t->t));
+
+  va_end(args);
 
   return false;
 }
