@@ -383,7 +383,10 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     op.type = OP_BASE;
     da_append(p->func, op);
     break;
-  case KEY_INDEX: unimpl("KEY_INDEX"); break;
+  case KEY_INDEX:
+    op.type = OP_INDEX;
+    da_append(p->func, op);
+    break;
   case KEY_CONST: unimpl("KEY_CONST"); break;
 
   case KEY_PUSH: unimpl("KEY_PUSH"); break;
