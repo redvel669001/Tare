@@ -249,7 +249,7 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
 
   switch (t->t->k) {
   case KEY_F: case KEY_B:
-    if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
+    if (t->t->k == KEY_B) op.type = OP_PTR_SUB;
     else op.type = OP_PTR_ADD;
     if (!expect_special(t, PAR_BGN)) return false;
     if (!next_token(t)) return false;
