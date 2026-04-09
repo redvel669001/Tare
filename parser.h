@@ -406,8 +406,24 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     break;
   case KEY_CONST: unimpl("KEY_CONST"); break;
 
-  case KEY_PUSH: unimpl("KEY_PUSH"); break;
-  case KEY_POP: unimpl("KEY_POP"); break;
+  case KEY_PUSH:
+    op.type = OP_PUSH;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
+  case KEY_POP:
+    op.type = OP_POP;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
 
   case KEY_ADD: unimpl("KEY_ADD"); break;
   case KEY_SUB: unimpl("KEY_SUB"); break;
