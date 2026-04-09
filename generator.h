@@ -247,7 +247,8 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   Operation *op = g->op;
   t->t = op->start;
 
-  fprintf(f, ";; %.*s\n", TOK_ARG(op->start));
+  bool noisy = true;
+  if (noisy) fprintf(f, ";; %.*s\n", TOK_ARG(op->start));
 
   switch (op->type) {
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
