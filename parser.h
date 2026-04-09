@@ -370,7 +370,27 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     da_append(p->func, op);
     break;
   case KEY_READ: unimpl("KEY_READ"); break;
-  case KEY_SYSCALL: unimpl("KEY_SYSCALL"); break;
+  case KEY_SYSCALL:
+    op.type = OP_SYSCALL;
+    if (!expect_special(t, PAR_BGN)) return false;
+    for (size_t i = 0; i < 6; i++) {
+      if (!next_token(t)) return false;
+      if (!parse_token_as_op(p)) return false;
+      op.op++;
+      if (!expect_token_type(t, TOKEN_TYPE_SPECIAL)) return false;
+      SpecialType s = t->t->s;
+      if (s == SEP) {
+        if (peek_next_token(t).t != TOKEN_TYPE_SPECIAL) continue;
+        if (!expect_special(t, PAR_END)) return false;
+        if (!expect_special(t, END)) return false;
+        break;
+      } else if (s == PAR_END) {
+        if (!expect_special(t, END)) return false;
+        break;
+      } else return false;
+    }
+    da_append(p->func, op);
+    break;
   case KEY_TAPE:
     op.type = OP_TAPE;
     da_append(p->func, op);
