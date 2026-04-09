@@ -300,8 +300,6 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     else if(t->t->k == KEY_R64) op.op = 8;
     da_append(p->func, op);
     break;
-  /* case KEY_IF: */
-    /* unimpl("KEY_IF"); break; */
   case KEY_IF: case KEY_WHILE:
     {
       Operation address = {.start = op.start, .type = OP_ADDRESS,
@@ -350,7 +348,6 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
       da_append(p->func, address);
     }
     break;
-    unimpl("KEY_WHILE"); break;
   case KEY_FUNC: if (!parse_func_sig(p)) return false; break;
   case KEY_RET:
     if (!expect_special(t, END)) return false;
