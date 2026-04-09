@@ -257,20 +257,15 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_ELEM_SUB: unimpl("OP_ELEM_SUB"); break;
   case OP_READ_SIZE: if (!gen_read_size_op(g, f, op->op)) return false; break;
   case OP_CONDITIONAL: gen_conditional_op(g, f); break;
-    unimpl("OP_CONDITIONAL"); break;
   case OP_GOTO: gen_goto_op(g, f); break;
-    unimpl("OP_GOTO"); break;
   case OP_ADDRESS: gen_address_op(g, f); break;
-    unimpl("OP_ADDRESS"); break;
   case OP_FUNCALL: gen_funcall_op(g, f); break;
-    unimpl("OP_FUNCALL"); break;
   case OP_RET: gen_ret_op(g, f); break;
   case OP_WRITE: gen_write_op(g, f); break;
   case OP_READ: unimpl("OP_READ"); break;
   case OP_SYSCALL: unimpl("OP_SYSCALL"); break;
   
   case OP_TAPE: gen_tape_op(g, f); break;
-    unimpl("OP_TAPE"); break;
   case OP_HEAD: gen_head_op(g, f); break;
   case OP_BASE: gen_base_op(g, f); break;
   case OP_INDEX: gen_index_op(g, f); break;
