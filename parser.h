@@ -300,8 +300,9 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     else if(t->t->k == KEY_R64) op.op = 8;
     da_append(p->func, op);
     break;
-  case KEY_IF: unimpl("KEY_IF"); break;
-  case KEY_WHILE:
+  /* case KEY_IF: */
+    /* unimpl("KEY_IF"); break; */
+  case KEY_IF: case KEY_WHILE:
     {
       Operation address = {.start = op.start, .type = OP_ADDRESS,
                            .op = t->index};
@@ -342,7 +343,7 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
       op.start = t->t;
       op.type = OP_GOTO;
       op.op = address.op;
-      da_append(p->func, op);
+      if (address.start->k == KEY_WHILE) da_append(p->func, op);
 
       address.start = t->t;
       address.op = t->index;
