@@ -376,7 +376,7 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     da_append(p->func, op);
     break;
   case KEY_HEAD:
-    op.type = OP_BASE;
+    op.type = OP_HEAD;
     da_append(p->func, op);
     break;
   case KEY_BASE:
