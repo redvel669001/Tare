@@ -60,7 +60,7 @@ TARE_DEF bool gen_func(Generator *g, FILE *f);
 TARE_DEF bool gen_op(Generator *g, FILE *f);
 
 TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f);
-/* TARE_DEF bool gen_ptr_sub_op(Generator *g, FILE *f); */
+TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f);
 TARE_DEF void gen_elem_add_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_elem_sub_op(Generator *g, FILE *f); */
 TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r);
@@ -252,7 +252,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
 
   switch (op->type) {
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
-  case OP_PTR_SUB: unimpl("OP_PTR_SUB"); break;
+  case OP_PTR_SUB: gen_ptr_sub_op(g, f); break;
   case OP_ELEM_ADD: gen_elem_add_op(g, f); break;
   case OP_ELEM_SUB: unimpl("OP_ELEM_SUB"); break;
   case OP_READ_SIZE: if (!gen_read_size_op(g, f, op->op)) return false; break;
@@ -303,13 +303,30 @@ TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f) {
   
   /* fprintf(f, "pop QWORD rax\n"); */
   
+  // TODO: get rid of this hack
+  if ((g->op - 1)->type != OP_INDEX) {
   fprintf(f, "mov cl, " READ_SHL "\n");
   fprintf(f, "shl QWORD rax, cl\n");
+  }
   fprintf(f, "add QWORD " TAPE_HEAD ", QWORD rax\n");
   (void)g; // ehhh???
 }
 
-/* TARE_DEF bool gen_ptr_sub_op(Generator *g, FILE *f); */
+TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f) {
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  
+  /* fprintf(f, "pop QWORD rax\n"); */
+
+  // TODO: get rid of this hack
+  if ((g->op - 1)->type != OP_INDEX) {
+  fprintf(f, "mov cl, " READ_SHL "\n");
+  fprintf(f, "shl QWORD rax, cl\n");
+  }
+  fprintf(f, "sub QWORD " TAPE_HEAD ", QWORD rax\n");
+  (void)g; // ehhh???
+}
 
 TARE_DEF void gen_elem_add_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
