@@ -71,7 +71,7 @@ TARE_DEF void gen_funcall_op(Generator *g, FILE *f);
 TARE_DEF void gen_ret_op(Generator *g, FILE *f);
 TARE_DEF void gen_write_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_read_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
+TARE_DEF void gen_syscall_op(Generator *g, FILE *f);
 
 TARE_DEF void gen_tape_op(Generator *g, FILE *f);
 TARE_DEF void gen_head_op(Generator *g, FILE *f);
@@ -263,7 +263,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_RET: gen_ret_op(g, f); break;
   case OP_WRITE: gen_write_op(g, f); break;
   case OP_READ: unimpl("OP_READ"); break;
-  case OP_SYSCALL: unimpl("OP_SYSCALL"); break;
+  case OP_SYSCALL: gen_syscall_op(g, f); break;
   
   case OP_TAPE: gen_tape_op(g, f); break;
   case OP_HEAD: gen_head_op(g, f); break;
@@ -420,7 +420,20 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
 
 /* TARE_DEF bool gen_read_op(Generator *g, FILE *f); */
 
-/* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
+TARE_DEF void gen_syscall_op(Generator *g, FILE *f) {
+  const char* regs[7] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
+
+  size_t pops = g->op->op;
+  while (pops--) {
+    fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+    fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+    fprintf(f, "mov QWORD %s, QWORD [rcx]\n", regs[pops]);
+    /* fprintf(f, "pop %s\n", regs[pops]); */
+  }
+  fprintf(f, "syscall\n");
+  
+  (void)g;
+}
 
 TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
