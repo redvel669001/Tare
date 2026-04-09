@@ -74,9 +74,9 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
 
 TARE_DEF void gen_tape_op(Generator *g, FILE *f);
-/* TARE_DEF bool gen_head_op(Generator *g, FILE *f); */
+TARE_DEF void gen_head_op(Generator *g, FILE *f);
 TARE_DEF void gen_base_op(Generator *g, FILE *f);
-/* TARE_DEF bool gen_index_op(Generator *g, FILE *f); */
+TARE_DEF void gen_index_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
 /* TARE_DEF bool gen_push_op(Generator *g, FILE *f); */
@@ -271,9 +271,9 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   
   case OP_TAPE: gen_tape_op(g, f); break;
     unimpl("OP_TAPE"); break;
-  case OP_HEAD: unimpl("OP_HEAD"); break;
+  case OP_HEAD: gen_head_op(g, f); break;
   case OP_BASE: gen_base_op(g, f); break;
-  case OP_INDEX: unimpl("OP_INDEX"); break;
+  case OP_INDEX: gen_index_op(g, f); break;
   case OP_CONST: unimpl("OP_CONST"); break;
 
   case OP_PUSH: unimpl("OP_PUSH"); break;
@@ -439,7 +439,16 @@ TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
   (void)g;
 }
 
-/* TARE_DEF bool gen_head_op(Generator *g, FILE *f); */
+TARE_DEF void gen_head_op(Generator *g, FILE *f) {
+  fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
+  
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  
+  /* fprintf(f, "push QWORD rax\n"); */
+  (void)g; // ehhh???
+}
 
 TARE_DEF void gen_base_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_BASE "\n");
@@ -452,7 +461,16 @@ TARE_DEF void gen_base_op(Generator *g, FILE *f) {
   (void)g; // ehhh???
 }
 
-/* TARE_DEF bool gen_index_op(Generator *g, FILE *f); */
+TARE_DEF void gen_index_op(Generator *g, FILE *f) {
+  fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
+  fprintf(f, "sub QWORD rax, QWORD " TAPE_BASE "\n");
+  
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+
+  (void)g;
+}
 
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
