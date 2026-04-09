@@ -79,8 +79,8 @@ TARE_DEF void gen_base_op(Generator *g, FILE *f);
 TARE_DEF void gen_index_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
-/* TARE_DEF bool gen_push_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_pop_op(Generator *g, FILE *f); */
+TARE_DEF void gen_push_op(Generator *g, FILE *f);
+TARE_DEF void gen_pop_op(Generator *g, FILE *f);
 
 /* TARE_DEF bool gen_add_op(Generator *g, FILE *f); */
 /* TARE_DEF bool gen_sub_op(Generator *g, FILE *f); */
@@ -271,8 +271,8 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_INDEX: gen_index_op(g, f); break;
   case OP_CONST: unimpl("OP_CONST"); break;
 
-  case OP_PUSH: unimpl("OP_PUSH"); break;
-  case OP_POP: unimpl("OP_POP"); break;
+  case OP_PUSH: gen_push_op(g, f); break;
+  case OP_POP: gen_pop_op(g, f); break;
 
   case OP_ADD: unimpl("OP_ADD"); break;
   case OP_SUB: unimpl("OP_SUB"); break;
@@ -482,9 +482,29 @@ TARE_DEF void gen_index_op(Generator *g, FILE *f) {
 
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
-/* TARE_DEF bool gen_push_op(Generator *g, FILE *f); */
+TARE_DEF void gen_push_op(Generator *g, FILE *f) {
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  /* fpritnf(f, "push QWORD rax\n"); */
+  fprintf(f, "push QWORD [rcx]");
+  
+  (void)g;
+}
 
-/* TARE_DEF bool gen_pop_op(Generator *g, FILE *f); */
+TARE_DEF void gen_pop_op(Generator *g, FILE *f) {
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "mov QWORD rax, QWORD [rcx]\n"); */
+  /* fpritnf(f, "push QWORD rax\n"); */
+  /* fprintf(f, "push QWORD [rcx]"); */
+  
+  fprintf(f, "pop QWORD rax\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
 
 /* TARE_DEF bool gen_add_op(Generator *g, FILE *f); */
