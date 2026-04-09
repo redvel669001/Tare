@@ -428,7 +428,7 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
 /* TARE_DEF bool gen_syscall_op(Generator *g, FILE *f); */
 
 TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
-  fprintf(f, "mov QWORD rax, QWORD " TAPE_BASE "\n");
+  fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
   fprintf(f, "mov QWORD rax, QWORD [rax]\n");
   /* fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n"); */
   
