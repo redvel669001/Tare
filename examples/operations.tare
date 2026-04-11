@@ -1,0 +1,20 @@
+func main: {
+  add(1, 2);
+  sub(1, 2);
+  mul(1, 2);
+  div(1, 2);
+  shl(1, 2);
+  shr(1, 2);
+  a(10);
+  n();
+  a(49);
+  n();
+  a(32);
+  n();
+  a(59);
+  n();
+  a(10);
+  n();
+  write(base, index);
+  ret;
+}
