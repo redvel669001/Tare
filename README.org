@@ -8,6 +8,65 @@ TBD
 * How to Use
 TBD
 
+* About Tare
+Tare started out as an attempt to make a simple language, on the level of Brainfuck with variable read size and functions. Later, I decided to add some more features to the language, such as variables, a type system, and function arguments, function return values, and so on.
+
+Eventually, I figured it would make sense for Tare to become a sort of "high-level assembly language", perhaps with some "tape-like semantics". Still not sure what exactly it would end up like, but I'm gonna have fun with this project in the meantime.
+
+* Goals
+- [ ] Decide whether to use a parser or not.
+- [ ] Decide whether to keep the simulator or not.
+- [ ] Revamp the flag parsing.
+- [ ] Add optimizations.
+- [ ] Add support for modules.
+- [ ] Rewrite the compiler in tare.
+
+** Parser
+Use a parser - yay or nay? The answer is still unclear to me.
+
+At first, I made a header file for the parser, and I tried to do something with it, but I noticed the language was simple enough that it would be simpler to just go right into code generation.
+
+Then I added functions, and unsure how to implement them, I decided to use the parser, after all. While still not sure how to implement functions - notably, function arguments and return values are still not quite worked out all that well - I figured out how to implement functions without the parser.
+
+And then came variables, and I wasn't sure how to work things out in that regard, and I realized the language would be fairly complicated to change without a parser, so I'm updating the parser, and it seems quite neat so far, and maybe I'll go for it, after all.
+
+However, I can also see myself figuring out how to skip the parsing stage, so I can't say for sure just yet. Either way, it would be nice to finally make a decision on the matter.
+
+** Simulator
+Keep the simulator around - yay or nay? Simulator, interpreter, call it whatever you want. The name doesn't really matter, honestly.
+
+The simulator is perhaps easier to debug - at least in comparison to code generation or parsing - at least for me, so I do want to keep it around. But at the same time, it's another part of the program, and syscalls alone make it unclear how I should handle things - perhaps inline assembly could help.
+
+All in all, the simulator is probably not worth it, but I want to try to keep it around for just a bit longer. I'll see how it goes, I suppose.
+
+** Flags
+Flag parsing needs to be reworked entirely, certainly for the compiler, maybe also for the testing. Not much more to add here!
+
+** Tare
+For the language itself, there are also some goals I have in mind!
+
+*** Keywords
+For one, there are some keywords that are currently not yet implemented, anywhere in this code base. Not in the parser, not in the generator without a parser, not in the generator with a parser, and not in the simulator. So, it's perhaps important to first implement these.
+
+*** Optimizations
+One fundamental problem with parsing is that the language's semantics can be less efficient, and presumably need to be for any complicated expression to get parsed correctly. The problem is a fair bit exacerbated with Tare being a "tape-like language", causing various complications for even simple actions.
+
+So, for example, consider the following:
+
+#+begin_src C
+a(3);
+#+end_src
+
+With a parser, it would generate code along the following logic: "push" `3` to OPS_TAPE, then "pop" from OPS_TAPE and perform pointer addition on the tape head. This is highly inefficient when considering that it could be reduced to a simple poitner addition on the tape head, but it's necessary for any more complicated expression. Perhaps something could be done to fix that, but I'm not sure how.
+
+There's also constant folding, I'd like getting around to that. More actionable may be function inlining. Dead code elimination could also be interesting, and so on.
+
+*** Modules
+I'd also like to add a module system to Tare! I'm not entirely sure how to go about that, but I'd probably want to add a namespacing mechanic as well as use modules. In all likelihood, this would also mean adding more passes to the compilation process, specifically patching the tokenizer. It would likely also mean patching tokenizers, plural, as this sort of proper module system would likely require operating with multiple tokenizers during compilation.
+
+*** Self-Hosting
+Not sure I should really put it as a goal. I'm still quite inexperienced, so I don't know how far I'll go with this, but it would be pretty neat to get to a point where the compiler can be written in Tare. It would probably also be incredibly annoying to add new features, but I'll have to see about that if and when I get to that point.
+
 * Credits
 ** Fasm
 This project wouldn't have been very possible without fasm (https://flatassembler.net/), both in generating assembly and in examining the binary translation of various instructions.
