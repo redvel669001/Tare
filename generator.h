@@ -70,7 +70,7 @@ TARE_DEF void gen_address_op(Generator *g, FILE *f);
 TARE_DEF void gen_funcall_op(Generator *g, FILE *f);
 TARE_DEF void gen_ret_op(Generator *g, FILE *f);
 TARE_DEF void gen_write_op(Generator *g, FILE *f);
-/* TARE_DEF bool gen_read_op(Generator *g, FILE *f); */
+TARE_DEF void gen_read_op(Generator *g, FILE *f);
 TARE_DEF void gen_syscall_op(Generator *g, FILE *f);
 
 TARE_DEF void gen_tape_op(Generator *g, FILE *f);
@@ -263,7 +263,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_FUNCALL: gen_funcall_op(g, f); break;
   case OP_RET: gen_ret_op(g, f); break;
   case OP_WRITE: gen_write_op(g, f); break;
-  case OP_READ: unimpl("OP_READ"); break;
+  case OP_READ: gen_read_op(g, f); break;
   case OP_SYSCALL: gen_syscall_op(g, f); break;
   
   case OP_TAPE: gen_tape_op(g, f); break;
@@ -431,7 +431,26 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
   (void)g; // ehhh???
 }
 
-/* TARE_DEF bool gen_read_op(Generator *g, FILE *f); */
+TARE_DEF void gen_read_op(Generator *g, FILE *f) {
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rdx, QWORD [rcx]\n");
+  /* fprintf(f, "pop QWORD rdx\n"); */
+  
+  fprintf(f, "mov cl, " READ_SHL "\n");
+  fprintf(f, "shl QWORD rdx, cl\n");
+  
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rsi, QWORD [rcx]\n");
+  /* fprintf(f, "pop QWORD rsi\n"); */
+  
+  fprintf(f, "mov rax, 0\n"); // read => syscall 0
+  fprintf(f, "mov rdi, 0\n"); // stdin => fd 0
+  
+  fprintf(f, "syscall\n");
+  (void)g; // ehhh???
+}
 
 TARE_DEF void gen_syscall_op(Generator *g, FILE *f) {
   const char* regs[7] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
