@@ -295,8 +295,8 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   
   /* fprintf(f, "pop QWORD rax\n"); */
   
@@ -311,8 +311,8 @@ TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   
   /* fprintf(f, "pop QWORD rax\n"); */
 
@@ -327,29 +327,29 @@ TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_elem_add_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   
   /* fprintf(f, "pop QWORD rax\n"); */
   
   fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
   
-  fprintf(f, "mov QWORD rcx, QWORD " TAPE_HEAD "\n");
-  fprintf(f, "add QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " TAPE_HEAD "\n");
+  fprintf(f, "add QWORD [rbx], QWORD rax\n");
   (void)g; // ehhh???
 }
 
 TARE_DEF void gen_elem_sub_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   
   /* fprintf(f, "pop QWORD rax\n"); */
   
   fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
   
-  fprintf(f, "mov QWORD rcx, QWORD " TAPE_HEAD "\n");
-  fprintf(f, "sub QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " TAPE_HEAD "\n");
+  fprintf(f, "sub QWORD [rbx], QWORD rax\n");
   (void)g; // ehhh???
 }
 
@@ -379,8 +379,8 @@ TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r) {
 
 TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
 
   fprintf(f, "cmp QWORD rax, 0\n");
@@ -413,16 +413,16 @@ TARE_DEF void gen_ret_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_write_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rdx, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rdx, QWORD [rbx]\n");
   /* fprintf(f, "pop QWORD rdx\n"); */
   
   fprintf(f, "mov cl, " READ_SHL "\n");
   fprintf(f, "shl QWORD rdx, cl\n");
   
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rsi, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rsi, QWORD [rbx]\n");
   /* fprintf(f, "pop QWORD rsi\n"); */
   
   fprintf(f, "mov rax, 1\n"); // write => syscall 1
@@ -434,16 +434,16 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_read_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rdx, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rdx, QWORD [rbx]\n");
   /* fprintf(f, "pop QWORD rdx\n"); */
   
   fprintf(f, "mov cl, " READ_SHL "\n");
   fprintf(f, "shl QWORD rdx, cl\n");
   
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rsi, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rsi, QWORD [rbx]\n");
   /* fprintf(f, "pop QWORD rsi\n"); */
   
   fprintf(f, "mov rax, 0\n"); // read => syscall 0
@@ -459,8 +459,8 @@ TARE_DEF void gen_syscall_op(Generator *g, FILE *f) {
   size_t pops = g->op->op;
   while (pops--) {
     fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-    fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-    fprintf(f, "mov QWORD %s, QWORD [rcx]\n", regs[pops]);
+    fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+    fprintf(f, "mov QWORD %s, QWORD [rbx]\n", regs[pops]);
     /* fprintf(f, "pop %s\n", regs[pops]); */
   }
   fprintf(f, "syscall\n");
@@ -473,8 +473,8 @@ TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD [rax]\n");
   /* fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n"); */
   
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
 
   (void)g;
@@ -483,8 +483,8 @@ TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
 TARE_DEF void gen_head_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
   
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
   
   /* fprintf(f, "push QWORD rax\n"); */
@@ -494,8 +494,8 @@ TARE_DEF void gen_head_op(Generator *g, FILE *f) {
 TARE_DEF void gen_base_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_BASE "\n");
   
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
   
   /* fprintf(f, "push QWORD rax\n"); */
@@ -506,8 +506,8 @@ TARE_DEF void gen_index_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
   fprintf(f, "sub QWORD rax, QWORD " TAPE_BASE "\n");
   
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
 
   (void)g;
@@ -517,24 +517,24 @@ TARE_DEF void gen_index_op(Generator *g, FILE *f) {
 
 TARE_DEF void gen_push_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
   /* fpritnf(f, "push QWORD rax\n"); */
-  fprintf(f, "push QWORD [rcx]");
+  fprintf(f, "push QWORD [rbx]");
   
   (void)g;
 }
 
 TARE_DEF void gen_pop_op(Generator *g, FILE *f) {
   /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
-  /* fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n"); */
-  /* fprintf(f, "mov QWORD rax, QWORD [rcx]\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "mov QWORD rax, QWORD [rbx]\n"); */
   /* fpritnf(f, "push QWORD rax\n"); */
-  /* fprintf(f, "push QWORD [rcx]"); */
+  /* fprintf(f, "push QWORD [rbx]"); */
   
   fprintf(f, "pop QWORD rax\n");
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
   (void)g;
 }
@@ -588,8 +588,8 @@ TARE_DEF void gen_num_op(Generator *g, FILE *f, bool mul, bool mask) {
   
   if (mask) fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
 
-  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
-  fprintf(f, "mov QWORD [rcx], QWORD rax\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
   
   /* fprintf(f, "push QWORD rax\n"); */
