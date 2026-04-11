@@ -62,7 +62,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f);
 TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f);
 TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f);
 TARE_DEF void gen_elem_add_op(Generator *g, FILE *f);
-/* TARE_DEF bool gen_elem_sub_op(Generator *g, FILE *f); */
+TARE_DEF void gen_elem_sub_op(Generator *g, FILE *f);
 TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r);
 TARE_DEF void gen_conditional_op(Generator *g, FILE *f);
 TARE_DEF void gen_goto_op(Generator *g, FILE *f);
@@ -255,7 +255,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
   case OP_PTR_SUB: gen_ptr_sub_op(g, f); break;
   case OP_ELEM_ADD: gen_elem_add_op(g, f); break;
-  case OP_ELEM_SUB: unimpl("OP_ELEM_SUB"); break;
+  case OP_ELEM_SUB: gen_elem_add_op(g, f); break;
   case OP_READ_SIZE: if (!gen_read_size_op(g, f, op->op)) return false; break;
   case OP_CONDITIONAL: gen_conditional_op(g, f); break;
   case OP_GOTO: gen_goto_op(g, f); break;
@@ -338,7 +338,19 @@ TARE_DEF void gen_elem_add_op(Generator *g, FILE *f) {
   (void)g; // ehhh???
 }
 
-/* TARE_DEF bool gen_elem_sub_op(Generator *g, FILE *f); */
+TARE_DEF void gen_elem_sub_op(Generator *g, FILE *f) {
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rcx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rcx]\n");
+  
+  /* fprintf(f, "pop QWORD rax\n"); */
+  
+  fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
+  
+  fprintf(f, "mov QWORD rcx, QWORD " TAPE_HEAD "\n");
+  fprintf(f, "sub QWORD [rcx], QWORD rax\n");
+  (void)g; // ehhh???
+}
 
 TARE_DEF bool gen_read_size_op(Generator *g, FILE *f, size_t r) {
   g->r = r;
