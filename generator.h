@@ -272,6 +272,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_INDEX: gen_index_op(g, f); break;
   case OP_CONST: unimpl("OP_CONST"); break;
 
+    // TODO: FIX `push` AND `pop`
   case OP_PUSH: gen_push_op(g, f); break;
   case OP_POP: gen_pop_op(g, f); break;
 

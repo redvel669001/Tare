@@ -406,6 +406,7 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     break;
   case KEY_CONST: unimpl("KEY_CONST"); break;
 
+    // TODO: FIX `push` AND `pop`
   case KEY_PUSH:
     op.type = OP_PUSH;
     if (!expect_special(t, PAR_BGN)) return false;
