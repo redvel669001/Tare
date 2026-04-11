@@ -82,12 +82,12 @@ TARE_DEF void gen_index_op(Generator *g, FILE *f);
 TARE_DEF void gen_push_op(Generator *g, FILE *f);
 TARE_DEF void gen_pop_op(Generator *g, FILE *f);
 
-/* TARE_DEF bool gen_add_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_sub_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_mul_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_div_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_shl_op(Generator *g, FILE *f); */
-/* TARE_DEF bool gen_shr_op(Generator *g, FILE *f); */
+TARE_DEF void gen_add_op(Generator *g, FILE *f);
+TARE_DEF void gen_sub_op(Generator *g, FILE *f);
+TARE_DEF void gen_mul_op(Generator *g, FILE *f);
+TARE_DEF void gen_div_op(Generator *g, FILE *f);
+TARE_DEF void gen_shl_op(Generator *g, FILE *f);
+TARE_DEF void gen_shr_op(Generator *g, FILE *f);
 /* TARE_DEF bool gen_deref_op(Generator *g, FILE *f); */
 
 /* TARE_DEF bool gen_arg_op(Generator *g, FILE *f); */
@@ -276,12 +276,12 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_PUSH: gen_push_op(g, f); break;
   case OP_POP: gen_pop_op(g, f); break;
 
-  case OP_ADD: unimpl("OP_ADD"); break;
-  case OP_SUB: unimpl("OP_SUB"); break;
-  case OP_MUL: unimpl("OP_MUL"); break;
-  case OP_DIV: unimpl("OP_DIV"); break;
-  case OP_SHL: unimpl("OP_SHL"); break;
-  case OP_SHR: unimpl("OP_SHR"); break;
+  case OP_ADD: gen_add_op(g, f); break;
+  case OP_SUB: gen_sub_op(g, f); break;
+  case OP_MUL: gen_mul_op(g, f); break;
+  case OP_DIV: gen_div_op(g, f); break;
+  case OP_SHL: gen_shl_op(g, f); break;
+  case OP_SHR: gen_shr_op(g, f); break;
   case OP_DEREF: unimpl("OP_DEREF"); break;
 
   case OP_ARG: unimpl("OP_ARG"); break;
@@ -540,17 +540,95 @@ TARE_DEF void gen_pop_op(Generator *g, FILE *f) {
 }
 
 
-/* TARE_DEF bool gen_add_op(Generator *g, FILE *f); */
+TARE_DEF void gen_add_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "add QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
-/* TARE_DEF bool gen_sub_op(Generator *g, FILE *f); */
+TARE_DEF void gen_sub_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "sub QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
-/* TARE_DEF bool gen_mul_op(Generator *g, FILE *f); */
+TARE_DEF void gen_mul_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mul QWORD [rbx]\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
-/* TARE_DEF bool gen_div_op(Generator *g, FILE *f); */
+TARE_DEF void gen_div_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "div QWORD [rbx]\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
-/* TARE_DEF bool gen_shl_op(Generator *g, FILE *f); */
+TARE_DEF void gen_shl_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov cl, BYTE [rbx]\n");
+  fprintf(f, "shl QWORD rax, cl\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
-/* TARE_DEF bool gen_shr_op(Generator *g, FILE *f); */
+TARE_DEF void gen_shr_op(Generator *g, FILE *f) {
+  // First argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
+  
+  // Second argument
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "mov cl, BYTE [rbx]\n");
+  fprintf(f, "shr QWORD rax, cl\n");
+  fprintf(f, "mov QWORD [rbx], QWORD rax\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+  (void)g;
+}
 
 /* TARE_DEF bool gen_deref_op(Generator *g, FILE *f); */
 
