@@ -8,22 +8,9 @@
 #define READ_MASK "[rbp-32]"
 
 #define ARGS_HEAD "[rbp-40]"
-#define ARGS_BASE "[rbp-48]"
-  
-#define RETS_HEAD "[rbp-56]"
-#define RETS_BASE "[rbp-64]"
-  
-#define VARS_HEAD "[rbp-72]"
-#define VARS_BASE "[rbp-80]"
-
-#define OPS_HEAD "[rbp-88]"
-#define OPS_BASE "[rbp-96]"
-
-
-/* #define ARGS_HEAD "[rbp-40]" */
-/* #define RETS_HEAD "[rbp-48]" */
-/* #define VARS_HEAD "[rbp-56]" */
-/* #define OPS_HEAD "[rbp-64]" */
+#define RETS_HEAD "[rbp-48]"
+#define VARS_HEAD "[rbp-56]"
+#define OPS_HEAD "[rbp-64]"
 
 
 // TODO: Make tape sizes compile-time and runtime variables.
@@ -144,16 +131,9 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   fprintf(f, "push 3\n");             // read size bit shifting
   fprintf(f, "push %zu\n", R64_MAX);  // read size bit mask
   
-  fprintf(f, "push " ARGS_NAME "\n"); // args base
   fprintf(f, "push " ARGS_NAME "\n"); // args head
-  
-  fprintf(f, "push " RETS_NAME "\n"); // rets base
   fprintf(f, "push " RETS_NAME "\n"); // rets head
-  
-  fprintf(f, "push " VARS_NAME "\n"); // vars base
   fprintf(f, "push " VARS_NAME "\n"); // vars head
-  
-  fprintf(f, "push " OPS_NAME "\n");  // ops base
   fprintf(f, "push " OPS_NAME "\n");  // ops head
 
 /* #define TAPE_NAME "tape" */
