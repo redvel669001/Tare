@@ -184,7 +184,7 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   for (size_t i = 0; i < gen.fns->count; i++) {
     gen.fni = i;
     gen.fn = gen.fns->items + i;
-    gen_func(&gen, f);
+    if (!gen_func(&gen, f)) return false;
   }
   
   fprintf(f, "segment readable writeable\n");
