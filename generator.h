@@ -226,7 +226,8 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
 TARE_DEF bool gen_func(Generator *g, FILE *f) {
   if (g == NULL || f == NULL) return false;
 
-  Func *fn = g->funcs->items + g->fni;
+  Function *fn = g->fn;
+  
   fprintf(f, ";; --------------------------------------------------\n");
   fprintf(f, ";; %.*s\n", SV_ARG(fn->name));
   fprintf(f, ";; --------------------------------------------------\n");
