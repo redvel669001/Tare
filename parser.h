@@ -425,14 +425,27 @@ TARE_DEF bool parse_keyword_as_op(Parser *p) {
     da_append(p->func, op);
     break;
 
-  case KEY_ADD: unimpl("KEY_ADD"); break;
-  case KEY_SUB: unimpl("KEY_SUB"); break;
-  case KEY_MUL: unimpl("KEY_MUL"); break;
-  case KEY_DIV: unimpl("KEY_DIV"); break;
-  case KEY_SHL: unimpl("KEY_SHL"); break;
-  case KEY_SHR: unimpl("KEY_SHR"); break;
+  case KEY_ADD: case KEY_SUB:
+  case KEY_MUL: case KEY_DIV:
+  case KEY_SHL: case KEY_SHR:
+    if (t->t->k == KEY_ADD) op.type = OP_ADD;
+    else if (t->t->k == KEY_SUB) op.type = OP_SUB;
+    else if (t->t->k == KEY_MUL) op.type = OP_MUL;
+    else if (t->t->k == KEY_DIV) op.type = OP_DIV;
+    else if (t->t->k == KEY_SHL) op.type = OP_SHL;
+    else if (t->t->k == KEY_SHR) op.type = OP_SHR;
+    if (!expect_special(t, PAR_BGN)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, SEP)) return false;
+    if (!next_token(t)) return false;
+    if (!parse_token_as_op(p)) return false;
+    if (!expect_special(t, PAR_END)) return false;
+    if (!expect_special(t, END)) return false;
+    da_append(p->func, op);
+    break;
   case KEY_DEREF: unimpl("KEY_DEREF"); break;
-  
+    
   case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
 
   default: unimpl("default case in parse_keyword_as_op"); break;
