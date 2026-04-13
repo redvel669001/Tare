@@ -109,19 +109,8 @@ typedef struct {
 TARE_DEF bool parse_file(Parser *p);
 TARE_DEF StringView sv_from_token(const Token *t);
 
-TARE_DEF bool parse_token_as_op(Parser *p);
-
-/* TARE_DEF bool parse_name_as_op(Parser *p); */
-/* TARE_DEF bool parse_whole_num_as_op(Parser *p); */
-/* TARE_DEF bool parse_frac_num_as_op(Parser *p); */
-TARE_DEF bool parse_keyword_as_op(Parser *p);
-/* TARE_DEF bool parse_special_as_op(Parser *p); */
-/* TARE_DEF bool parse_string_as_op(Parser *p); */
-/* TARE_DEF bool parse_char_as_op(Parser *p); */
-/* TARE_DEF bool parse_vid_as_op(Parser *p); */
-/* TARE_DEF bool parse_tid_as_op(Parser *p); */
-TARE_DEF bool parse_fid_as_op(Parser *p);
-/* TARE_DEF bool parse_token_types_as_op(Parser *p); */
+TARE_DEF bool parse_statement(Parser *p);
+TARE_DEF bool parse_expression(Parser *p);
 
 TARE_DEF bool parse_func_sig(Parser *p);
 
@@ -160,7 +149,7 @@ TARE_DEF bool parse_file(Parser *p) {
   p->fns = &fns;
   
   while (true) {
-    if (!parse_token_as_op(p)) return false;
+    if (!parse_statement(p)) return false;
     if (!next_token(t)) break;
   }
 
@@ -195,38 +184,146 @@ TARE_DEF StringView sv_from_token(const Token *t) {
   return (StringView) {.s = t->f, .l = t->l};
 }
 
-TARE_DEF bool parse_token_as_op(Parser *p) {
+TARE_DEF bool parse_statement(Parser *p) {
   if (p == NULL) return false;
   
   Tokenizer *t = p->t;
+
+  Operation op = {.start = t->t};
   
   switch (t->t->t) {
   case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
-  case TOKEN_TYPE_WHOLE_NUM:
-    {
-      Operation op = {.start = t->t,
-                      .type = OP_NUM,
-                      .op = t->t->u64};
-      assert(p->func != NULL);
-      da_append(p->func, op);
-    }
-    return true; // maybe?
-    unimpl("TOKEN_TYPE_WHOLE_NUM"); break;
+  case TOKEN_TYPE_WHOLE_NUM: unimpl("TOKEN_TYPE_WHOLE_NUM"); break;
   case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
   case TOKEN_TYPE_KEYWORD:
-    if (!parse_keyword_as_op(p)) return false;
+    switch (t->t->k) {
+    case KEY_F: case KEY_B:
+    case KEY_N: case KEY_P:
+    case KEY_A: case KEY_S:
+    case KEY_I: case KEY_D:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+    case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
+      op.type = OP_READ_SIZE;
+      if (t->t->k == KEY_R8) op.op = 1;
+      else if(t->t->k == KEY_R16) op.op = 2;
+      else if(t->t->k == KEY_R32) op.op = 4;
+      else if(t->t->k == KEY_R64) op.op = 8;
+      da_append(p->func, op);
+      break;
+    case KEY_IF: case KEY_WHILE:
+      {
+        Operation address = {.start = op.start, .type = OP_ADDRESS,
+                             .op = t->index};
+        op.type = OP_CONDITIONAL;
+        da_append(p->func, address);
+        if (!next_token(t)) return false;
+        if (!parse_expression(p)) return false;
+        if (!expect_special(t, DEF)) return false;
+        if (!next_token(t)) return false;
+        if (t->t->t == TOKEN_TYPE_SPECIAL) {
+          if (t->t->s == BLK_BGN) {
+            op.op = t->t->jmp;
+            if (!next_token(t)) return false;
+          }
+        } else {
+          bool found = false;
+          for (Token *tok = t->t; tok < t->items + t->count; tok++) {
+            if (tok->t != TOKEN_TYPE_SPECIAL) continue;
+            if (tok->s == END) {
+              op.op = (size_t) (tok - t->items);
+              found = true;
+            } else if (tok->s == BLK_BGN) {
+              op.op = t->t->jmp;
+              found = true;
+            }
+            if (found) break;
+          }
+          if (!found) return false;
+        }
+        
+        da_append(p->func, op);
+        da_append(p->gotos, op.op);
+        while (t->index != op.op) {
+          if (!parse_statement(p)) return false;
+          if (t->index == op.op) break;
+          if (!next_token(t)) return false;
+        }
+        op.start = t->t;
+        op.type = OP_GOTO;
+        op.op = address.op;
+        if (address.start->k == KEY_WHILE) da_append(p->func, op);
+
+        address.start = t->t;
+        address.op = t->index;
+        da_append(p->func, address);
+      }
+      break;
+    case KEY_FUNC:
+      if (!parse_func_sig(p)) return false;
+      {
+        size_t end = t->t->jmp;
+        while (true) {
+          if (!next_token(t)) return false;
+          if (t->index == end) break;
+          if (!parse_statement(p)) return false;
+        }
+      }
+      /* if (!expect_special(t, END)) return false; */
+      break;
+    case KEY_RET:
+      if (!expect_special(t, END)) return false;
+      op.type = OP_RET;
+      da_append(p->func, op);
+      break;
+    case KEY_WRITE: case KEY_READ:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+    case KEY_SYSCALL:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+    case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+      diag_errf(t, t->t,
+                "tare statements do not begin with keyword `%.*s`.\n",
+                SV_ARG(Keywords[t->t->k]));
+      return false;
+    case KEY_CONST: unimpl("KEY_CONST"); break;
+
+      // TODO: FIX `push` AND `pop`
+    case KEY_PUSH:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+    case KEY_POP:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+
+    case KEY_ADD: case KEY_SUB:
+    case KEY_MUL: case KEY_DIV:
+    case KEY_SHL: case KEY_SHR:
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, END)) return false;
+      break;
+    case KEY_DEREF: unimpl("KEY_DEREF"); break;
+    
+    case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
+
+    default: unimpl("default case in parse_keyword_as_op"); break;
+    }
     break;
-  case TOKEN_TYPE_SPECIAL:
-    break; // TODO: actually handle this
-    unimpl("TOKEN_TYPE_SPECIAL"); break;
+  case TOKEN_TYPE_SPECIAL: unimpl("TOKEN_TYPE_SPECIAL"); break;
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
   case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
-    if (!parse_fid_as_op(p)) return false;
+    if (!parse_expression(p)) return false;
+    if (!expect_special(t, END)) return false;
     break;
-    unimpl("TOKEN_TYPE_FID"); break;
   case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
   default: unimpl("default case in parse_token_as_op"); break;
   }
@@ -234,246 +331,216 @@ TARE_DEF bool parse_token_as_op(Parser *p) {
   return true;
 }
 
-/* TARE_DEF bool parse_name_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_whole_num_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_frac_num_as_op(Parser *p); */
-
-TARE_DEF bool parse_keyword_as_op(Parser *p) {
+TARE_DEF bool parse_expression(Parser *p) {
   if (p == NULL) return false;
   
   Tokenizer *t = p->t;
-  
-  Operation op = {.start = p->t->t};
 
-  switch (t->t->k) {
-  case KEY_F: case KEY_B:
-    if (t->t->k == KEY_B) op.type = OP_PTR_SUB;
-    else op.type = OP_PTR_ADD;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
+  Operation op = {.start = t->t};
+  
+  switch (t->t->t) {
+  case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
+  case TOKEN_TYPE_WHOLE_NUM:
+    op.type = OP_NUM;
+    op.op = t->t->u64;
     da_append(p->func, op);
     break;
-  case KEY_N: case KEY_P:
-    if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
-    else op.type = OP_PTR_ADD;
-    {
-      Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
-      da_append(p->func, operation);
-    }
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_A: case KEY_S:
-    if (t->t->k == KEY_S) op.type = OP_ELEM_SUB;
-    else op.type = OP_ELEM_ADD;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_I: case KEY_D:
-    if (t->t->k == KEY_D) op.type = OP_ELEM_SUB;
-    else op.type = OP_ELEM_ADD;
-    {
-      Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
-      da_append(p->func, operation);
-    }
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
-    op.type = OP_READ_SIZE;
-    if (t->t->k == KEY_R8) op.op = 1;
-    else if(t->t->k == KEY_R16) op.op = 2;
-    else if(t->t->k == KEY_R32) op.op = 4;
-    else if(t->t->k == KEY_R64) op.op = 8;
-    da_append(p->func, op);
-    break;
-  case KEY_IF: case KEY_WHILE:
-    {
-      Operation address = {.start = op.start, .type = OP_ADDRESS,
-                           .op = t->index};
-      op.type = OP_CONDITIONAL;
-      da_append(p->func, address);
+  case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
+  case TOKEN_TYPE_KEYWORD:
+    switch (t->t->k) {
+    case KEY_F: case KEY_B:
+    case KEY_A: case KEY_S:
+      if (t->t->k == KEY_F) op.type = OP_PTR_ADD;
+      else if (t->t->k == KEY_B) op.type = OP_PTR_SUB;
+      else if (t->t->k == KEY_A) op.type = OP_ELEM_ADD;
+      else if (t->t->k == KEY_S) op.type = OP_ELEM_SUB;
+      else return false;
       if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
-      if (!parse_token_as_op(p)) return false;
+      if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      if (!expect_special(t, DEF)) return false;
-      if (!next_token(t)) return false;
-      if (t->t->t == TOKEN_TYPE_SPECIAL) {
-        if (t->t->s == BLK_BGN) {
-          op.op = t->t->jmp;
-        }
-      } else {
-        bool found = false;
-        for (Token *tok = t->t; tok < t->items + t->count; tok++) {
-          if (tok->t != TOKEN_TYPE_SPECIAL) continue;
-          if (tok->s == END) {
-            op.op = (size_t) (tok - t->items);
-            found = true;
-          } else if (tok->s == BLK_BGN) {
-            op.op = t->t->jmp;
-            found = true;
-          }
-          if (found) break;
-        }
-        if (!found) return false;
-      }
       da_append(p->func, op);
-      da_append(p->gotos, op.op);
+      break;
+    case KEY_N: case KEY_P:
+    case KEY_I: case KEY_D:
+      if (t->t->k == KEY_N) op.type = OP_PTR_ADD;
+      else if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
+      else if (t->t->k == KEY_I) op.type = OP_ELEM_ADD;
+      else if (t->t->k == KEY_D) op.type = OP_ELEM_SUB;
+      else return false;
+      {
+        Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
+        da_append(p->func, operation);
+      }
+      if (!expect_special(t, PAR_BGN)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      da_append(p->func, op);
+      break;
+    case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
+      diag_errf(t, t->t,
+                "tare expressions do not begin with keyword `%.*s`.\n",
+                SV_ARG(Keywords[t->t->k]));
+      break;
+    case KEY_IF: case KEY_WHILE:
+      diag_errf(t, t->t,
+                "tare expressions do not begin with keyword `%.*s`.\n",
+                SV_ARG(Keywords[t->t->k]));
+      break;
+    case KEY_FUNC:
+      {
+        if (!expect_fid(t)) return false;
+        const Token *name = t->t;
+        size_t fid = t->t->fid;
+        Func *fn = p->fns->items + fid;
+        // Should probably become more involved than this.
+        if (!to_token(t, fn->start)) return false;
+        p->func = p->funcs->items + fid;
+        p->func->name = sv_from_token(name);
+      }
+      break;
+    case KEY_RET:
+      diag_errf(t, t->t,
+                "tare expressions do not begin with keyword `%.*s`.\n",
+                SV_ARG(Keywords[t->t->k]));
+      break;
+    case KEY_WRITE: case KEY_READ:
+      if (t->t->k == KEY_WRITE) op.type = OP_WRITE;
+      else if (t->t->k == KEY_READ) op.type = OP_READ;
+      else return false;
+      if (!expect_special(t, PAR_BGN)) return false;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, SEP)) return false;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      da_append(p->func, op);
+      break;
+    case KEY_SYSCALL:
+      op.type = OP_SYSCALL;
+      if (!expect_special(t, PAR_BGN)) return false;
       while (true) {
         if (!next_token(t)) return false;
-        if (t->index == op.op) break;
-        if (!parse_token_as_op(p)) return false;
+        if (!parse_expression(p)) return false;
+        if (op.op > 6) return false;
+        op.op++;
+        if (!expect_token_type(t, TOKEN_TYPE_SPECIAL)) return false;
+        SpecialType s = t->t->s;
+        if (s == SEP) {
+          if (peek_next_token(t).t != TOKEN_TYPE_SPECIAL) continue;
+          if (!expect_special(t, PAR_END)) return false;
+          break;
+        } else if (s == PAR_END) break;
+        else return false;
       }
-      op.start = t->t;
-      op.type = OP_GOTO;
-      op.op = address.op;
-      if (address.start->k == KEY_WHILE) da_append(p->func, op);
+      da_append(p->func, op);
+      break;
+    case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+      if (t->t->k == KEY_TAPE) op.type = OP_TAPE;
+      else if (t->t->k == KEY_HEAD) op.type = OP_HEAD;
+      else if (t->t->k == KEY_BASE) op.type = OP_BASE;
+      else if (t->t->k == KEY_INDEX) op.type = OP_INDEX;
+      else return false;
+      da_append(p->func, op);
+      break;
+    case KEY_CONST: unimpl("KEY_CONST"); break;
 
-      address.start = t->t;
-      address.op = t->index;
-      da_append(p->func, address);
-    }
-    break;
-  case KEY_FUNC: if (!parse_func_sig(p)) return false; break;
-  case KEY_RET:
-    if (!expect_special(t, END)) return false;
-    op.type = OP_RET;
-    da_append(p->func, op);
-    break;
-  case KEY_WRITE:
-    op.type = OP_WRITE;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, SEP)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_READ: unimpl("KEY_READ"); break;
-  case KEY_SYSCALL:
-    op.type = OP_SYSCALL;
-    if (!expect_special(t, PAR_BGN)) return false;
-    for (size_t i = 0; i < 6; i++) {
+      // TODO: FIX `push` AND `pop`
+    case KEY_PUSH:
+      op.type = OP_PUSH;
+      if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
-      if (!parse_token_as_op(p)) return false;
-      op.op++;
-      if (!expect_token_type(t, TOKEN_TYPE_SPECIAL)) return false;
-      SpecialType s = t->t->s;
-      if (s == SEP) {
-        if (peek_next_token(t).t != TOKEN_TYPE_SPECIAL) continue;
-        if (!expect_special(t, PAR_END)) return false;
-        if (!expect_special(t, END)) return false;
-        break;
-      } else if (s == PAR_END) {
-        if (!expect_special(t, END)) return false;
-        break;
-      } else return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      da_append(p->func, op);
+      break;
+    case KEY_POP:
+      op.type = OP_POP;
+      if (!expect_special(t, PAR_BGN)) return false;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      da_append(p->func, op);
+      break;
+
+    case KEY_ADD: case KEY_SUB:
+    case KEY_MUL: case KEY_DIV:
+    case KEY_SHL: case KEY_SHR:
+      if (t->t->k == KEY_ADD) op.type = OP_ADD;
+      else if (t->t->k == KEY_SUB) op.type = OP_SUB;
+      else if (t->t->k == KEY_MUL) op.type = OP_MUL;
+      else if (t->t->k == KEY_DIV) op.type = OP_DIV;
+      else if (t->t->k == KEY_SHL) op.type = OP_SHL;
+      else if (t->t->k == KEY_SHR) op.type = OP_SHR;
+      else return false;
+      if (!expect_special(t, PAR_BGN)) return false;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, SEP)) return false;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!expect_special(t, PAR_END)) return false;
+      if (p->func->count < 2) return false;
+      else {
+        Operation *second = p->func->items + p->func->count - 1;
+        Operation *first = second - 1;
+        if (first->type == OP_NUM && second->type == OP_NUM) {
+          if (op.type == OP_ADD) op.op = first->op + second->op;
+          else if (op.type == OP_SUB) op.op = first->op - second->op;
+          else if (op.type == OP_MUL) op.op = first->op * second->op;
+          else if (op.type == OP_DIV) op.op = first->op / second->op;
+          else if (op.type == OP_SHL) op.op = first->op << second->op;
+          else if (op.type == OP_SHR) op.op = first->op >> second->op;
+          p->func->count -= 2;
+          op.type = OP_NUM;
+        }
+      }
+      da_append(p->func, op);
+      break;
+    case KEY_DEREF: unimpl("KEY_DEREF"); break;
+    
+    case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
+
+    default: unimpl("default case in parse_expression keyword switch"); break;
+    }
+    break;
+  case TOKEN_TYPE_SPECIAL:
+    if (t->t->s == PAR_BGN) {
+      size_t end = t->t->jmp;
+      while (true) {
+        if (!next_token(t)) return false;
+        if (t->index == end) break;
+        if (!parse_expression(p)) return false;
+      }
+    } else return false;
+    break;
+  case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
+  case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
+  case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
+  case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
+  case TOKEN_TYPE_FID:
+    /* if (p == NULL) return false; */
+    /* Tokenizer *t = p->t; */
+    op.type = OP_FUNCALL;
+    op.op = t->t->fid;
+    if (!expect_special(t, PAR_BGN)) return false;
+    {
+      size_t end = t->t->jmp;
+      if (!next_token(t)) return false;
+      while (t->index != end) {
+        if (!parse_expression(p)) return false;
+        if (!expect_special_many(t, SEP, PAR_END)) return false;
+        if (!next_token(t)) return false;
+      }
     }
     da_append(p->func, op);
     break;
-  case KEY_TAPE:
-    op.type = OP_TAPE;
-    da_append(p->func, op);
-    break;
-  case KEY_HEAD:
-    op.type = OP_HEAD;
-    da_append(p->func, op);
-    break;
-  case KEY_BASE:
-    op.type = OP_BASE;
-    da_append(p->func, op);
-    break;
-  case KEY_INDEX:
-    op.type = OP_INDEX;
-    da_append(p->func, op);
-    break;
-  case KEY_CONST: unimpl("KEY_CONST"); break;
-
-    // TODO: FIX `push` AND `pop`
-  case KEY_PUSH:
-    op.type = OP_PUSH;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_POP:
-    op.type = OP_POP;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-
-  case KEY_ADD: case KEY_SUB:
-  case KEY_MUL: case KEY_DIV:
-  case KEY_SHL: case KEY_SHR:
-    if (t->t->k == KEY_ADD) op.type = OP_ADD;
-    else if (t->t->k == KEY_SUB) op.type = OP_SUB;
-    else if (t->t->k == KEY_MUL) op.type = OP_MUL;
-    else if (t->t->k == KEY_DIV) op.type = OP_DIV;
-    else if (t->t->k == KEY_SHL) op.type = OP_SHL;
-    else if (t->t->k == KEY_SHR) op.type = OP_SHR;
-    if (!expect_special(t, PAR_BGN)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, SEP)) return false;
-    if (!next_token(t)) return false;
-    if (!parse_token_as_op(p)) return false;
-    if (!expect_special(t, PAR_END)) return false;
-    if (!expect_special(t, END)) return false;
-    da_append(p->func, op);
-    break;
-  case KEY_DEREF: unimpl("KEY_DEREF"); break;
-    
-  case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
-
-  default: unimpl("default case in parse_keyword_as_op"); break;
+  case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
+  default: unimpl("default case in parse_expression token type switch"); break;
   }
 
-  return true;
+  return true;  
 }
-
-/* TARE_DEF bool parse_special_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_string_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_char_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_vid_as_op(Parser *p); */
-
-/* TARE_DEF bool parse_tid_as_op(Parser *p); */
-
-TARE_DEF bool parse_fid_as_op(Parser *p) {
-  if (p == NULL) return false;
-  Tokenizer *t = p->t;
-  Operation op = {.start = t->t, .type = OP_FUNCALL, .op = t->t->fid};
-  da_append(p->func, op);
-  return true;
-}
-
-/* TARE_DEF bool parse_token_types_as_op(Parser *p); */
 
 TARE_DEF bool parse_func_sig(Parser *p) {
   Tokenizer *t = p->t;
