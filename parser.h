@@ -628,6 +628,7 @@ TARE_DEF bool parse_expression(Parser *p) {
 TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
   if (p == NULL) return false;
 
+  // TODO: attach types to expressions.
   switch (op->type) {
   case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
   case OP_READ_SIZE:
