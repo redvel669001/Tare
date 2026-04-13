@@ -62,6 +62,7 @@ typedef enum {
   OP_DIV,
   OP_SHL,
   OP_SHR,
+  OP_NOT,
   OP_DEREF,
 
   OP_ARG,
@@ -305,6 +306,7 @@ TARE_DEF bool parse_statement(Parser *p) {
     case KEY_ADD: case KEY_SUB:
     case KEY_MUL: case KEY_DIV:
     case KEY_SHL: case KEY_SHR:
+    case KEY_NOT:
       if (!parse_expression(p)) return false;
       if (!expect_special(t, END)) return false;
       break;
@@ -862,6 +864,7 @@ TARE_DEF const char *op_type_as_string(OpType type) {
   case OP_DIV: return "OP_DIV";
   case OP_SHL: return "OP_SHL";
   case OP_SHR: return "OP_SHR";
+  case OP_NOT: return "OP_NOT";
   case OP_DEREF: return "OP_DEREF";
 
   case OP_ARG: return "OP_ARG";
