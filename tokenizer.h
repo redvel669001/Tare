@@ -5,8 +5,6 @@
 // the reporting system is largely copied from nob_log
 // https://github.com/tsoding/nob.h/blob/main/nob.h
 
-#include <stdarg.h>
-
 #define TOK_ARG(t) (int) (t)->l, (t)->f
 
 typedef enum {

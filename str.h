@@ -1,6 +1,8 @@
 #ifndef STR_H_
 #define STR_H_
 
+#include <stdarg.h>
+
 // Lots of things in this header file were copied from nob.h, though
 // most of these things were additionally simplified.
 // https://github.com/tsoding/nob.h/blob/main/nob.h
@@ -22,13 +24,12 @@ typedef struct {
 
 TARE_DEF bool read_file(const char *path, String *buf);
 
+TARE_DEF void str_appendf(String *str, const char *fmt, ...);
 TARE_DEF bool append_to_string(String *str, const char *string, size_t len);
 TARE_DEF bool append_sv_to_string(String *str, StringView sv);
 TARE_DEF bool append_cstr_to_string(String *str, const char *cstr);
 
 TARE_DEF bool sv_eq(StringView sv1, StringView sv2);
-
-// TODO: add appending to string with formatting
 
 #endif // STR_H_
 
@@ -69,6 +70,21 @@ TARE_DEF bool read_file(const char *path, String *buf) {
   
   fclose(f);
   return true;
+}
+
+TARE_DEF void str_appendf(String *str, const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  size_t n = vsnprintf(NULL, 0, fmt, args);
+  va_end(args);
+
+  da_reserve(str, str->count + n + 1);
+  va_start(args, fmt);
+  vsnprintf(str->items + str->count, n + 1, fmt, args);
+  va_end(args);
+
+  str->count += n;
 }
 
 TARE_DEF bool append_to_string(String *str, const char *string, size_t len) {
