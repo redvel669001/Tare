@@ -15,6 +15,6 @@ func main: {
 }
 
 func recursion: {
-  write(base, 1); i(); if(tape): {recursion();} // end
+  write(base, 1); i(); if tape: recursion();
   ret;
 }
