@@ -113,6 +113,7 @@ TARE_DEF StringView sv_from_token(const Token *t);
 TARE_DEF bool parse_statement(Parser *p);
 TARE_DEF bool parse_expression(Parser *p);
 
+TARE_DEF bool optimize_expression(Parser *p, Operation *op);
 TARE_DEF bool parse_func_sig(Parser *p);
 
 TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
@@ -482,21 +483,14 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      if (p->func->count < 2) return false;
-      else {
-        Operation *second = p->func->items + p->func->count - 1;
-        Operation *first = second - 1;
-        if (first->type == OP_NUM && second->type == OP_NUM) {
-          if (op.type == OP_ADD) op.op = first->op + second->op;
-          else if (op.type == OP_SUB) op.op = first->op - second->op;
-          else if (op.type == OP_MUL) op.op = first->op * second->op;
-          else if (op.type == OP_DIV) op.op = first->op / second->op;
-          else if (op.type == OP_SHL) op.op = first->op << second->op;
-          else if (op.type == OP_SHR) op.op = first->op >> second->op;
-          p->func->count -= 2;
-          op.type = OP_NUM;
-        }
-      }
+      if (!optimize_expression(p, &op)) return false;
+      da_append(p->func, op);
+      break;
+    case KEY_NOT:
+      op.type = OP_NOT;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!optimize_expression(p, &op)) return false;
       da_append(p->func, op);
       break;
     case KEY_DEREF: unimpl("KEY_DEREF"); break;
@@ -542,6 +536,112 @@ TARE_DEF bool parse_expression(Parser *p) {
   }
 
   return true;  
+}
+
+TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
+  if (p == NULL) return false;
+
+  switch (op->type) {
+  case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
+  case OP_READ_SIZE:
+  case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
+  case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
+  case OP_TYPES: default: return false;
+
+  case OP_ADD:
+  case OP_SUB:
+  case OP_MUL:
+  case OP_DIV:
+  case OP_SHL:
+  case OP_SHR:
+    if (p->func->count < 2) return false;
+    else {
+      Operation *second = p->func->items + p->func->count - 1;
+      Operation *first = second - 1;
+      if (first->type != OP_NUM || second->type != OP_NUM) return true;
+      
+      if (op->type == OP_ADD) op->op = first->op + second->op;
+      else if (op->type == OP_SUB) op->op = first->op - second->op;
+      else if (op->type == OP_MUL) op->op = first->op * second->op;
+      else if (op->type == OP_DIV) op->op = first->op / second->op;
+      else if (op->type == OP_SHL) op->op = first->op << second->op;
+      else if (op->type == OP_SHR) op->op = first->op >> second->op;
+      p->func->count -= 2;
+      op->type = OP_NUM;
+    }
+    break;
+  case OP_NOT:
+    if (p->func->count < 1) return false;
+    else {
+      Operation *operation = p->func->items + p->func->count - 1;
+      if (operation->type == OP_NUM) {
+        op->op = !operation->op;
+        p->func->count--;
+        op->type = OP_NUM;
+      }
+    }
+    break;
+    
+  case OP_DEREF:
+    {
+      Tokenizer *t = p->t;
+      t->t = op->start;
+      unimpl("OP_DEREF optimization");
+      /* return false; */
+    }
+    break;
+  }
+
+  return true;
+}
+
+TARE_DEF bool check_for_continued_expression(Parser *p) {
+  Tokenizer *t = p->t;
+  if (peek_next_token(t).t != TOKEN_TYPE_SPECIAL) return false;
+  SpecialType s = peek_next_token(t).s;
+  if (s != DIV && s != MULT && s != ADD && s != SUB) return false;
+  return true;
+}
+
+TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
+  switch (type) {
+  case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
+  case OP_READ_SIZE:
+  case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
+  case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
+  case OP_TYPES:
+    return OP_PRECS;
+    
+  case OP_ADD: case OP_SUB: return PREC_ADD_SUB;
+  case OP_MUL: case OP_DIV: return PREC_MUL_DIV;
+    
+  case OP_SHL: return OP_PRECS;
+  case OP_SHR: return OP_PRECS;
+  case OP_DEREF: return OP_PRECS;
+
+  case OP_NOT: return OP_PRECS;
+  default: return OP_PRECS;
+  }
+}
+
+TARE_DEF OpPrec get_prec_by_special_type(SpecialType s) {
+  switch (s) {
+  case PAR_BGN: return PREC_PAR_BGN;
+  case PAR_END: case GRP_BGN: case GRP_END: case BLK_BGN: case BLK_END:
+  case DQUOTE: case SQUOTE: case ESC: case SEP: case END: case DOT: case DEF:
+    return OP_PRECS;
+  case DIV: case MULT: return PREC_MUL_DIV;
+  case ADD: case SUB: return PREC_ADD_SUB;
+      
+  case LESS: return OP_PRECS;
+  case GREATER: return OP_PRECS;
+    
+  case EQUAL: case SPECIAL_TYPES: case NOT: default: return OP_PRECS;
+  }
 }
 
 TARE_DEF bool parse_func_sig(Parser *p) {
