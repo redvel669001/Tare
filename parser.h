@@ -465,6 +465,10 @@ TARE_DEF bool parse_expression(Parser *p) {
       else if (t->t->k == KEY_INDEX) op.type = OP_INDEX;
       else return false;
       da_append(p->func, op);
+      if (check_for_continued_expression(p)) {
+        if (!next_token(t)) return false;
+        if (!parse_expression(p)) return false;
+      }
       break;
     case KEY_CONST: unimpl("KEY_CONST"); break;
 
