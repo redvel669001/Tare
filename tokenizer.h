@@ -589,8 +589,8 @@ TARE_DEF bool expect_special(Tokenizer *t, SpecialType s) {
   /* print_loc(stderr, t, t->t); */
   /* fprintf(stderr, "error: expected %c but got %c instead.\n", */
   /*         Specials[s], t->t->c); */
-  diag_errf(t, t->t, "expected `%c` but got `%c` instead.\n",
-          Specials[s], t->t->c);
+  diag_errf(t, t->t, "expected `%c` but got `%.*s` instead.\n",
+            Specials[s], TOK_ARG(t->t));
   return false;
 }
 
