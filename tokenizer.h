@@ -28,10 +28,11 @@ typedef enum {
   LESS,
   GREATER,
   EQUAL,
+  NOT,
   SPECIAL_TYPES,
 } SpecialType;
 
-const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=";
+const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!";
 
 typedef enum {
   KEY_F = 0,
@@ -68,6 +69,7 @@ typedef enum {
   KEY_DIV,
   KEY_SHL,
   KEY_SHR,
+  KEY_NOT,
   KEY_DEREF,
   
   KEYWORD_TYPES,
@@ -108,6 +110,7 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_DIV]     =  SV_MAKE(div),
   [KEY_SHL]     =  SV_MAKE(shl),
   [KEY_SHR]     =  SV_MAKE(shr),
+  [KEY_NOT]     =  SV_MAKE(not),
   [KEY_DEREF]   =  SV_MAKE(deref),
 };
 
@@ -272,6 +275,7 @@ TARE_DEF SpecialType special_index(char c) {
   case '<': return LESS;
   case '>': return GREATER;
   case '=': return EQUAL;
+  case '!': return NOT;
   default: return SPECIAL_TYPES;
   }
 }
