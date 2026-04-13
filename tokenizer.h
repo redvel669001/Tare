@@ -220,6 +220,7 @@ TARE_DEF bool to_token(Tokenizer *t, size_t index);
 TARE_DEF bool first_token(Tokenizer *t);
 TARE_DEF bool next_token(Tokenizer *t);
 TARE_DEF bool prev_token(Tokenizer *t);
+TARE_DEF Token peek_prev_token(const Tokenizer *t);
 TARE_DEF Token peek_next_token(const Tokenizer *t);
 
 TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type);
@@ -492,6 +493,11 @@ TARE_DEF bool next_token(Tokenizer *t) {
 
 TARE_DEF bool prev_token(Tokenizer *t) {
   return to_token(t, t->index - 1);
+}
+
+TARE_DEF Token peek_prev_token(const Tokenizer *t) {
+  if (!check_bounds(t->index - 1, t->count)) return (Token) {0};
+  return t->items[t->index - 1];
 }
 
 TARE_DEF Token peek_next_token(const Tokenizer *t) {
