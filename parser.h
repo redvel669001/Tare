@@ -71,6 +71,14 @@ typedef enum {
   OP_TYPES,
 } OpType;
 
+// TODO: fill this properly
+typedef enum {
+  PREC_ADD_SUB = 0,
+  PREC_MUL_DIV,
+  PREC_PAR_BGN,
+  OP_PRECS,
+} OpPrec;
+
 struct Operation {
   Token *start;
   OpType type;
@@ -114,6 +122,11 @@ TARE_DEF bool parse_statement(Parser *p);
 TARE_DEF bool parse_expression(Parser *p);
 
 TARE_DEF bool optimize_expression(Parser *p, Operation *op);
+
+TARE_DEF bool check_for_continued_expression(Parser *p);
+TARE_DEF OpPrec get_prec_by_op_type(OpType type);
+TARE_DEF OpPrec get_prec_by_special_type(SpecialType s);
+
 TARE_DEF bool parse_func_sig(Parser *p);
 
 TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
@@ -340,13 +353,20 @@ TARE_DEF bool parse_expression(Parser *p) {
   Tokenizer *t = p->t;
 
   Operation op = {.start = t->t};
-  
+
   switch (t->t->t) {
   case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
   case TOKEN_TYPE_WHOLE_NUM:
     op.type = OP_NUM;
     op.op = t->t->u64;
     da_append(p->func, op);
+    if (!check_for_continued_expression(p)) break;
+    if (peek_prev_token(t).t == TOKEN_TYPE_SPECIAL) {
+      SpecialType s = peek_prev_token(t).s;
+      if (s == DIV || s == MULT || s == ADD || s == SUB) break;
+    }
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
     break;
   case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
   case TOKEN_TYPE_KEYWORD:
@@ -501,14 +521,81 @@ TARE_DEF bool parse_expression(Parser *p) {
     }
     break;
   case TOKEN_TYPE_SPECIAL:
-    if (t->t->s == PAR_BGN) {
-      size_t end = t->t->jmp;
-      while (true) {
+    switch (t->t->s) {
+    case PAR_BGN:
+      {
+        size_t end = t->t->jmp;
+        while (true) {
+          if (!next_token(t)) return false;
+          if (t->index == end) break;
+          if (!parse_expression(p)) return false;
+        }
+        if (check_for_continued_expression(p)) {
+          if (!next_token(t)) return false;
+          if (!parse_expression(p)) return false;
+        }
+      }
+      break;
+    case PAR_END:
+    case GRP_BGN: case GRP_END:
+    case BLK_BGN: case BLK_END:
+    case END:
+    case DOT:
+    case DEF:
+      diag_errf(t, t->t,
+                "tare expressions do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+    case DQUOTE: case SQUOTE: case ESC:
+      diag_errf(t, t->t,
+                "special token `%c` at beginning of expression doesn't make sense. This is probably a tokenizer error!\n", Specials[t->t->s]);
+      return false;
+    case SEP: unimpl("SEP"); break;
+      
+    case DIV: case MULT: case ADD: case SUB: 
+      if (t->t->s == ADD) op.type = OP_ADD;
+      else if (t->t->s == SUB) op.type = OP_SUB;
+      else if (t->t->s == MULT) op.type = OP_MUL;
+      else if (t->t->s == DIV) op.type = OP_DIV;
+      else return false;
+      // TODO: handle shl and shr with special haracters
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (check_for_continued_expression(p)) {
+        OpPrec current = get_prec_by_op_type(op.type);
+        OpPrec next = get_prec_by_special_type(peek_next_token(t).s);
+        if (next > current) {
+          if (!next_token(t)) return false;
+          if (!parse_expression(p)) return false;
+        }
+      }
+      if (!optimize_expression(p, &op)) return false;
+      da_append(p->func, op);
+      
+      if (check_for_continued_expression(p)) {
         if (!next_token(t)) return false;
-        if (t->index == end) break;
         if (!parse_expression(p)) return false;
       }
-    } else return false;
+      break;
+      
+    case LESS: unimpl("LESS"); break;
+    case GREATER: unimpl("GREATER"); break;
+    case EQUAL: unimpl("EQUAL"); break;
+    case NOT:
+      op.type = OP_NOT;
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      if (!optimize_expression(p, &op)) return false;
+      da_append(p->func, op);
+      
+      if (check_for_continued_expression(p)) {
+        if (!next_token(t)) return false;
+        if (!parse_expression(p)) return false;
+      }
+      break;
+    case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
+    }
+    
     break;
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
