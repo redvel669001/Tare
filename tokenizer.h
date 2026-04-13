@@ -192,9 +192,6 @@ typedef enum {
   REPORT_ERROR,
 } ReportLevel;
 
-/* #define PRINTF_FORMAT_ATTR(STRING_INDEX, FIRST_TO_CHECK) __attribute__ ((format (printf, STRING_INDEX, FIRST_TO_CHECK))) */
-/* NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...) NOB_PRINTF_FORMAT(2, 3); */
-
 TARE_DEF SpecialType special_index(char c);
 TARE_DEF bool tokenize_file(const char *path, Tokenizer *t);
 TARE_DEF bool fill_tokenizer(Tokenizer *t);
@@ -208,10 +205,6 @@ TARE_DEF void report(ReportLevel r, const Tokenizer *t, const Token *tok, const 
   report(REPORT_WARNING, (t), (tok), (fmt), __VA_ARGS__)
 #define diag_errf(t, tok, fmt, ...) \
   report(REPORT_ERROR, (t), (tok), (fmt), __VA_ARGS__)
-
-/* #define diag_note(t, tok, fmt, ...) diag_notef((t), (tok), (fmt), NULL) */
-/* #define diag_warn(t, tok, fmt, ...) diag_warnf((t), (tok), (fmt), NULL) */
-/* #define diag_err(t, tok, fmt, ...) diag_errf((t), (tok), (fmt), NULL) */
 
 #define diag_note(t, tok, fmt, ...) report(REPORT_NOTE, (t), (tok), (fmt))
 #define diag_warn(t, tok, fmt, ...) report(REPORT_WARNING, (t), (tok), (fmt))
