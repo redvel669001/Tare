@@ -198,6 +198,8 @@ TARE_DEF bool gen_from_token(Generator *g, FILE *f) {
       if (!gen_conditional(g, f, true)) return false;
       break;
     case KEY_FUNC: if (!gen_func_sig(g, f)) return false; break;
+    case KEY_BREAK: unimpl("KEY_BREAK"); break;
+    case KEY_CONT: unimpl("KEY_CONT"); break;
     case KEY_RET:
       {
         Func *fn = g->funcs->items + g->t->t->fid;

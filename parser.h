@@ -122,6 +122,8 @@ TARE_DEF StringView sv_from_token(const Token *t);
 TARE_DEF bool parse_statement(Parser *p);
 TARE_DEF bool parse_expression(Parser *p);
 
+TARE_DEF bool parse_expression_arithmetics(Parser *p);
+
 TARE_DEF bool optimize_expression(Parser *p, Operation *op);
 
 TARE_DEF bool check_for_continued_expression(Parser *p);
@@ -268,12 +270,16 @@ TARE_DEF bool parse_statement(Parser *p) {
         }
         
         da_append(p->func, op);
-        da_append(p->gotos, op.op);
+        if (op.start->k == KEY_WHILE) {
+          da_append(p->gotos, address.op);
+          da_append(p->gotos, op.op);
+        }
         while (t->index != op.op) {
           if (!parse_statement(p)) return false;
           if (t->index == op.op) break;
           if (!next_token(t)) return false;
         }
+        p->gotos->count -= 2;
         op.start = t->t;
         op.type = OP_GOTO;
         op.op = address.op;
@@ -283,6 +289,21 @@ TARE_DEF bool parse_statement(Parser *p) {
         address.op = t->index;
         da_append(p->func, address);
       }
+      break;
+    case KEY_BREAK: case KEY_CONT:
+      op.type = OP_GOTO;
+      if (p->gotos->count < 2) return false;
+      /* assert(p->gotos->count == 2 && "what?"); */
+      {
+        size_t count = p->gotos->count;
+        size_t *gotos = p->gotos->items;
+        
+      if (t->t->k == KEY_BREAK) op.op = gotos[count - 1];
+      else if (t->t->k == KEY_CONT) op.op = gotos[count - 2];
+      else return false;
+      }
+      if (!expect_special(t, END)) return false;
+      da_append(p->func, op);
       break;
     case KEY_FUNC:
       /* { */
@@ -352,7 +373,49 @@ TARE_DEF bool parse_statement(Parser *p) {
     default: unimpl("default case in parse_keyword_as_op"); break;
     }
     break;
-  case TOKEN_TYPE_SPECIAL: unimpl("TOKEN_TYPE_SPECIAL"); break;
+  case TOKEN_TYPE_SPECIAL:
+    switch (t->t->s) {
+    case PAR_BGN: case PAR_END: 
+    case GRP_BGN: case GRP_END:
+      diag_errf(t, t->t,
+                "tare statements do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+      
+    case BLK_BGN:
+      {
+        size_t end = t->t->jmp;
+        while (true) {
+          if (!next_token(t)) return false;
+          if (t->index == end) break;
+          if (!parse_statement(p)) return false;
+        }
+      }
+      break;
+    case BLK_END:
+    case DQUOTE: case SQUOTE: 
+    case ESC: case SEP: 
+      diag_errf(t, t->t,
+                "tare statements do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+    case DOT: case DEF: case DIV: case MULT: case ADD: case SUB: 
+    case LESS: case GREATER:
+      diag_errf(t, t->t,
+                "tare statements do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+    case EQUAL: unimpl("EQUAL"); break;
+    case NOT: 
+      diag_errf(t, t->t,
+                "tare statements do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+    case END:
+      break;
+    case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
+    }
+    break;
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
   case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
@@ -424,29 +487,13 @@ TARE_DEF bool parse_expression(Parser *p) {
       return true;
       break;
     case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
-      diag_errf(t, t->t,
-                "tare expressions do not begin with keyword `%.*s`.\n",
-                SV_ARG(Keywords[t->t->k]));
-      return false;
-      break;
-    case KEY_IF: case KEY_WHILE:
-      diag_errf(t, t->t,
-                "tare expressions do not begin with keyword `%.*s`.\n",
-                SV_ARG(Keywords[t->t->k]));
-      return false;
-      break;
+    case KEY_IF: case KEY_WHILE: case KEY_BREAK: case KEY_CONT:
     case KEY_FUNC:
-      diag_errf(t, t->t,
-                "tare expressions do not begin with keyword `%.*s`.\n",
-                SV_ARG(Keywords[t->t->k]));
-      return false;
-      break;
     case KEY_RET:
       diag_errf(t, t->t,
                 "tare expressions do not begin with keyword `%.*s`.\n",
                 SV_ARG(Keywords[t->t->k]));
       return false;
-      break;
     case KEY_WRITE: case KEY_READ:
       if (t->t->k == KEY_WRITE) op.type = OP_WRITE;
       else if (t->t->k == KEY_READ) op.type = OP_READ;
@@ -466,7 +513,11 @@ TARE_DEF bool parse_expression(Parser *p) {
       while (true) {
         if (!next_token(t)) return false;
         if (!parse_expression(p)) return false;
-        if (op.op > 6) return false;
+        if (op.op > 6) {
+          diag_err(t, t->t, "tare currently doesn't support syscalls with more than 6 arguments.\n");
+          diag_notef(t, t->t, "the first argument for keyword `%.*s` is the syscall index, and the following arguments are the actual arguemtns to the syscall. So the keyword takes 7 arguemnts, but the syscall only takes 6 arguments.\n", SV_ARG(Keywords[KEY_SYSCALL]));
+          return false;
+        }
         op.op++;
         if (!expect_token_type(t, TOKEN_TYPE_SPECIAL)) return false;
         SpecialType s = t->t->s;
@@ -575,29 +626,33 @@ TARE_DEF bool parse_expression(Parser *p) {
       return false;
     case DQUOTE: case SQUOTE: case ESC:
       diag_errf(t, t->t,
-                "special token `%c` at beginning of expression doesn't make sense. This is probably a tokenizer error!\n", Specials[t->t->s]);
+                "special token `%c` at beginning of tare expression doesn't make sense. This is probably a tokenizer error!\n", Specials[t->t->s]);
       return false;
     case SEP: unimpl("SEP"); break;
       
     case DIV: case MULT: case ADD: case SUB: 
-      if (t->t->s == ADD) op.type = OP_ADD;
-      else if (t->t->s == SUB) op.type = OP_SUB;
-      else if (t->t->s == MULT) op.type = OP_MUL;
-      else if (t->t->s == DIV) op.type = OP_DIV;
-      else return false;
-      // TODO: handle shl and shr with special haracters
-      if (!next_token(t)) return false;
-      if (!parse_expression(p)) return false;
-      if (check_for_continued_expression(p)) {
-        OpPrec current = get_prec_by_op_type(op.type);
-        OpPrec next = get_prec_by_special_type(peek_next_token(t).s);
-        if (next > current) {
-          if (!next_token(t)) return false;
-          if (!parse_expression(p)) return false;
-        }
-      }
-      if (!optimize_expression(p, &op)) return false;
-      da_append(p->func, op);
+      diag_errf(t, t->t,
+                "tare expressions do not begin with special token `%c`.\n",
+                Specials[t->t->s]);
+      return false;
+      /* if (t->t->s == ADD) op.type = OP_ADD; */
+      /* else if (t->t->s == SUB) op.type = OP_SUB; */
+      /* else if (t->t->s == MULT) op.type = OP_MUL; */
+      /* else if (t->t->s == DIV) op.type = OP_DIV; */
+      /* else return false; */
+      /* // TODO: handle shl and shr with special haracters */
+      /* if (!next_token(t)) return false; */
+      /* if (!parse_expression(p)) return false; */
+      /* if (check_for_continued_expression(p)) { */
+      /*   OpPrec current = get_prec_by_op_type(op.type); */
+      /*   OpPrec next = get_prec_by_special_type(peek_next_token(t).s); */
+      /*   if (next > current) { */
+      /*     if (!next_token(t)) return false; */
+      /*     if (!parse_expression(p)) return false; */
+      /*   } */
+      /* } */
+      /* if (!optimize_expression(p, &op)) return false; */
+      /* da_append(p->func, op); */
       break;
       
     case LESS: unimpl("LESS"); break;
@@ -639,9 +694,70 @@ TARE_DEF bool parse_expression(Parser *p) {
   default: unimpl("default case in parse_expression token type switch"); break;
   }
 
-  if (check_for_continued_expression(p)) {
+  while (check_for_continued_expression(p)) {
+    if (!next_token(t)) return false;
+    if (!parse_expression_arithmetics(p)) return false;
+  }
+
+  return true;  
+}
+
+TARE_DEF bool parse_expression_arithmetics(Parser *p) {
+  if (p == NULL) return false;
+  
+  Tokenizer *t = p->t;
+
+  if (t->t->t != TOKEN_TYPE_SPECIAL) return false;
+
+  Operation op = {.start = t->t};
+
+  switch (t->t->s) {
+  case PAR_BGN:
+    assert(false && "this really shouldn't happen");
+    break;
+  case PAR_END:
+  case GRP_BGN: case GRP_END:
+  case BLK_BGN: case BLK_END:
+  case END:
+  case DOT:
+  case DEF:
+    diag_errf(t, t->t, "tare expressions arithmetics do not begin with special token `%c`.\n", Specials[t->t->s]);
+    return false;
+  case DQUOTE: case SQUOTE: case ESC:
+    diag_errf(t, t->t,
+              "special token `%c` at beginning of tare expression arithmetifcs doesn't make sense. This is probably a tokenizer error!\n", Specials[t->t->s]);
+    return false;
+  case SEP: unimpl("SEP"); break;
+      
+  case DIV: case MULT: case ADD: case SUB: 
+    if (t->t->s == ADD) op.type = OP_ADD;
+    else if (t->t->s == SUB) op.type = OP_SUB;
+    else if (t->t->s == MULT) op.type = OP_MUL;
+    else if (t->t->s == DIV) op.type = OP_DIV;
+    else return false;
+    // TODO: handle shl and shr with special haracters
     if (!next_token(t)) return false;
     if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = get_prec_by_special_type(peek_next_token(t).s);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    da_append(p->func, op);
+    break;
+      
+  case LESS: unimpl("LESS"); break;
+  case GREATER: unimpl("GREATER"); break;
+  case EQUAL: unimpl("EQUAL"); break;
+  case NOT:
+    diag_errf(t, t->t, "tare expressions arithmetics do not begin with special token `%c`.\n", Specials[t->t->s]);
+    return false;
+    break;
+  case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
   }
 
   return true;  
@@ -771,7 +887,7 @@ TARE_DEF bool is_token_expression(const Token *t) {
     case KEY_I: case KEY_D:
       return true; // TODO: decide if these should be expressions or not
     case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
-    case KEY_IF: case KEY_WHILE:
+    case KEY_IF: case KEY_WHILE: case KEY_BREAK: case KEY_CONT:
       return false;
     case KEY_FUNC:
       return false;
@@ -813,11 +929,13 @@ TARE_DEF bool is_token_expression(const Token *t) {
     case SEP: return false; // ???
       
     case DIV: case MULT: case ADD: case SUB:
-      return true;
+      /* return true; */
+      return false;
       
     case LESS: case GREATER: case EQUAL: return false;
     case NOT:
-      return true;
+      /* return true; */
+      return false;
     case SPECIAL_TYPES: return false;
     }
     break;
