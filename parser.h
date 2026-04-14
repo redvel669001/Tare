@@ -75,6 +75,7 @@ typedef enum {
 typedef enum {
   PREC_ADD_SUB = 0,
   PREC_MUL_DIV,
+  /* PREC_NOT, */
   PREC_PAR_BGN,
   OP_PRECS,
 } OpPrec;
@@ -126,6 +127,7 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op);
 TARE_DEF bool check_for_continued_expression(Parser *p);
 TARE_DEF OpPrec get_prec_by_op_type(OpType type);
 TARE_DEF OpPrec get_prec_by_special_type(SpecialType s);
+TARE_DEF bool is_token_expression(const Token *t);
 
 TARE_DEF bool parse_func_sig(Parser *p);
 
@@ -204,8 +206,14 @@ TARE_DEF bool parse_statement(Parser *p) {
   
   Tokenizer *t = p->t;
 
-  Operation op = {.start = t->t};
+  if (is_token_expression(t->t)) {
+    if (!parse_expression(p)) return false;
+    if (!expect_special(t, END)) return false;
+    return true;
+  }
   
+  Operation op = {.start = t->t};
+
   switch (t->t->t) {
   case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
   case TOKEN_TYPE_WHOLE_NUM: unimpl("TOKEN_TYPE_WHOLE_NUM"); break;
@@ -216,6 +224,7 @@ TARE_DEF bool parse_statement(Parser *p) {
     case KEY_N: case KEY_P:
     case KEY_A: case KEY_S:
     case KEY_I: case KEY_D:
+      // TODO: decide if these should be expressions or not
       if (!parse_expression(p)) return false;
       if (!expect_special(t, END)) return false;
       break;
@@ -276,6 +285,18 @@ TARE_DEF bool parse_statement(Parser *p) {
       }
       break;
     case KEY_FUNC:
+      /* { */
+      /*   if (!expect_fid(t)) return false; */
+      /*   const Token *name = t->t; */
+      /*   size_t fid = t->t->fid; */
+      /*   Func *fn = p->fns->items + fid; */
+      /*   // Should probably become more involved than this. */
+      /*   if (!to_token(t, fn->start)) return false; */
+      /*   p->func = p->funcs->items + fid; */
+      /*   p->func->name = sv_from_token(name); */
+      /* } */
+      /* return true; */
+
       if (!parse_func_sig(p)) return false;
       {
         size_t end = t->t->jmp;
@@ -360,19 +381,19 @@ TARE_DEF bool parse_expression(Parser *p) {
     op.type = OP_NUM;
     op.op = t->t->u64;
     da_append(p->func, op);
-    if (!check_for_continued_expression(p)) break;
+    if (!check_for_continued_expression(p)) return true;
     if (peek_prev_token(t).t == TOKEN_TYPE_SPECIAL) {
       SpecialType s = peek_prev_token(t).s;
-      if (s == DIV || s == MULT || s == ADD || s == SUB) break;
+      if (s == DIV || s == MULT || s == ADD || s == SUB
+          || s == NOT) return true;
     }
-    if (!next_token(t)) return false;
-    if (!parse_expression(p)) return false;
     break;
   case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
   case TOKEN_TYPE_KEYWORD:
     switch (t->t->k) {
     case KEY_F: case KEY_B:
     case KEY_A: case KEY_S:
+      // TODO: decide if these should be expressions or not
       if (t->t->k == KEY_F) op.type = OP_PTR_ADD;
       else if (t->t->k == KEY_B) op.type = OP_PTR_SUB;
       else if (t->t->k == KEY_A) op.type = OP_ELEM_ADD;
@@ -383,9 +404,11 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
       da_append(p->func, op);
+      return true;
       break;
     case KEY_N: case KEY_P:
     case KEY_I: case KEY_D:
+      // TODO: decide if these should be expressions or not
       if (t->t->k == KEY_N) op.type = OP_PTR_ADD;
       else if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
       else if (t->t->k == KEY_I) op.type = OP_ELEM_ADD;
@@ -398,33 +421,31 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!expect_special(t, PAR_BGN)) return false;
       if (!expect_special(t, PAR_END)) return false;
       da_append(p->func, op);
+      return true;
       break;
     case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
       diag_errf(t, t->t,
                 "tare expressions do not begin with keyword `%.*s`.\n",
                 SV_ARG(Keywords[t->t->k]));
+      return false;
       break;
     case KEY_IF: case KEY_WHILE:
       diag_errf(t, t->t,
                 "tare expressions do not begin with keyword `%.*s`.\n",
                 SV_ARG(Keywords[t->t->k]));
+      return false;
       break;
     case KEY_FUNC:
-      {
-        if (!expect_fid(t)) return false;
-        const Token *name = t->t;
-        size_t fid = t->t->fid;
-        Func *fn = p->fns->items + fid;
-        // Should probably become more involved than this.
-        if (!to_token(t, fn->start)) return false;
-        p->func = p->funcs->items + fid;
-        p->func->name = sv_from_token(name);
-      }
+      diag_errf(t, t->t,
+                "tare expressions do not begin with keyword `%.*s`.\n",
+                SV_ARG(Keywords[t->t->k]));
+      return false;
       break;
     case KEY_RET:
       diag_errf(t, t->t,
                 "tare expressions do not begin with keyword `%.*s`.\n",
                 SV_ARG(Keywords[t->t->k]));
+      return false;
       break;
     case KEY_WRITE: case KEY_READ:
       if (t->t->k == KEY_WRITE) op.type = OP_WRITE;
@@ -464,11 +485,12 @@ TARE_DEF bool parse_expression(Parser *p) {
       else if (t->t->k == KEY_BASE) op.type = OP_BASE;
       else if (t->t->k == KEY_INDEX) op.type = OP_INDEX;
       else return false;
-      da_append(p->func, op);
-      if (check_for_continued_expression(p)) {
-        if (!next_token(t)) return false;
-        if (!parse_expression(p)) return false;
+      if (peek_prev_token(t).t == TOKEN_TYPE_SPECIAL) {
+        SpecialType s = peek_prev_token(t).s;
+        if (s == DIV || s == MULT || s == ADD || s == SUB
+            || s == NOT) return true;
       }
+      da_append(p->func, op);
       break;
     case KEY_CONST: unimpl("KEY_CONST"); break;
 
@@ -480,6 +502,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
       da_append(p->func, op);
+      return true;
       break;
     case KEY_POP:
       op.type = OP_POP;
@@ -528,15 +551,15 @@ TARE_DEF bool parse_expression(Parser *p) {
     switch (t->t->s) {
     case PAR_BGN:
       {
+        Token prev = peek_prev_token(t);
         size_t end = t->t->jmp;
         while (true) {
           if (!next_token(t)) return false;
           if (t->index == end) break;
           if (!parse_expression(p)) return false;
         }
-        if (check_for_continued_expression(p)) {
-          if (!next_token(t)) return false;
-          if (!parse_expression(p)) return false;
+        if (prev.t == TOKEN_TYPE_SPECIAL) {
+          if (prev.s == NOT) return true;
         }
       }
       break;
@@ -575,11 +598,6 @@ TARE_DEF bool parse_expression(Parser *p) {
       }
       if (!optimize_expression(p, &op)) return false;
       da_append(p->func, op);
-      
-      if (check_for_continued_expression(p)) {
-        if (!next_token(t)) return false;
-        if (!parse_expression(p)) return false;
-      }
       break;
       
     case LESS: unimpl("LESS"); break;
@@ -591,11 +609,6 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!parse_expression(p)) return false;
       if (!optimize_expression(p, &op)) return false;
       da_append(p->func, op);
-      
-      if (check_for_continued_expression(p)) {
-        if (!next_token(t)) return false;
-        if (!parse_expression(p)) return false;
-      }
       break;
     case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
     }
@@ -624,6 +637,11 @@ TARE_DEF bool parse_expression(Parser *p) {
     break;
   case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
   default: unimpl("default case in parse_expression token type switch"); break;
+  }
+
+  if (check_for_continued_expression(p)) {
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
   }
 
   return true;  
@@ -715,6 +733,7 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   case OP_SHR: return OP_PRECS;
   case OP_DEREF: return OP_PRECS;
 
+  /* case OP_NOT: return PREC_NOT; */
   case OP_NOT: return OP_PRECS;
   default: return OP_PRECS;
   }
@@ -732,8 +751,85 @@ TARE_DEF OpPrec get_prec_by_special_type(SpecialType s) {
   case LESS: return OP_PRECS;
   case GREATER: return OP_PRECS;
     
-  case EQUAL: case SPECIAL_TYPES: case NOT: default: return OP_PRECS;
+  /* case NOT: return PREC_NOT; */
+  case NOT: return OP_PRECS;
+    
+  case EQUAL: case SPECIAL_TYPES: default: return OP_PRECS;
   }
+}
+
+TARE_DEF bool is_token_expression(const Token *t) {
+  switch (t->t) {
+  case TOKEN_TYPE_NAME: return false;
+  case TOKEN_TYPE_WHOLE_NUM: return true;
+  case TOKEN_TYPE_FRAC_NUM: return false; // should be true later, I suppose
+  case TOKEN_TYPE_KEYWORD:
+    switch (t->k) {
+    case KEY_F: case KEY_B:
+    case KEY_A: case KEY_S:
+    case KEY_N: case KEY_P:
+    case KEY_I: case KEY_D:
+      return true; // TODO: decide if these should be expressions or not
+    case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
+    case KEY_IF: case KEY_WHILE:
+      return false;
+    case KEY_FUNC:
+      return false;
+    case KEY_RET:
+      return false;
+    case KEY_WRITE: case KEY_READ:
+    case KEY_SYSCALL:
+    case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+      return true;
+    case KEY_CONST: return false;
+
+      // TODO: FIX `push` AND `pop`
+    case KEY_PUSH:
+    case KEY_POP:
+      return true;
+
+    case KEY_ADD: case KEY_SUB:
+    case KEY_MUL: case KEY_DIV:
+    case KEY_SHL: case KEY_SHR:
+    case KEY_NOT:
+      return true;
+    case KEY_DEREF:
+      return false;
+    
+    case KEYWORD_TYPES: default: return false;
+    }
+    break;
+  case TOKEN_TYPE_SPECIAL:
+    switch (t->s) {
+    case PAR_BGN: return true;
+    case PAR_END:
+    case GRP_BGN: case GRP_END:
+    case BLK_BGN: case BLK_END:
+    case END:
+    case DOT:
+    case DEF:
+    case DQUOTE: case SQUOTE: case ESC:
+      return false;
+    case SEP: return false; // ???
+      
+    case DIV: case MULT: case ADD: case SUB:
+      return true;
+      
+    case LESS: case GREATER: case EQUAL: return false;
+    case NOT:
+      return true;
+    case SPECIAL_TYPES: return false;
+    }
+    break;
+  case TOKEN_TYPE_STRING: return false;
+  case TOKEN_TYPE_CHAR: return false;
+  case TOKEN_TYPE_VID: return false;
+  case TOKEN_TYPE_TID: return false;
+  case TOKEN_TYPE_FID: return true;
+  case TOKEN_TYPES: default: return false;
+  }
+  
+  return false;
 }
 
 TARE_DEF bool parse_func_sig(Parser *p) {
