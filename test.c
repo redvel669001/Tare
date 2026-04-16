@@ -38,6 +38,7 @@ typedef enum {
   EXAMPLES_RETS,
   EXAMPLES_FUNC_WITH_RETS,
   EXAMPLES_PUSH,
+  EXAMPLES_OPERATIONS,
   EXAMPLES_COUNT,
 } Example;
 
@@ -63,6 +64,7 @@ const char *examples[EXAMPLES_COUNT] = {
   "./examples/rets.tare",
   "./examples/func_with_rets.tare",
   "./examples/push.tare",
+  "./examples/operations.tare",
 };
 
 int main(void) {
