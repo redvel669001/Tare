@@ -4,6 +4,12 @@
 typedef struct Operation Operation;
 
 typedef struct {
+  Operation *items;
+  size_t count;
+  size_t capacity;
+} Operations;
+
+typedef struct {
   StringView name;
   size_t vid;
   size_t tid;
@@ -63,20 +69,47 @@ typedef enum {
   OP_SHL,
   OP_SHR,
   OP_NOT,
+  OP_BITWISE_AND,
+  OP_BITWISE_OR,
+  OP_LOGICAL_AND,
+  OP_LOGICAL_OR,
+  
+  OP_LESS,
+  OP_LESS_EQUAL,
+  OP_GREATER,
+  OP_GREATER_EQUAL,
+  OP_EQUAL,
+  OP_NOT_EQUAL,
+  
   OP_DEREF,
 
   OP_ARG,
   OP_NUM,
-  
+
+  OP_POP_FROM_OPS,
+
   OP_TYPES,
 } OpType;
 
 // TODO: fill this properly
 typedef enum {
-  PREC_ADD_SUB = 0,
-  PREC_MUL_DIV,
-  /* PREC_NOT, */
+  PREC_LOGICAL_OR = 0,
+  PREC_LOGICAL_AND,
+  PREC_BITWISE_OR,
+  /* PREC_BITWISE_XOR, */
+  PREC_BITWISE_AND,
+  PREC_EQUAL_NEQUAL,
+  PREC_LESS_GREATER_LEQUAL_GEQUAL,
+  PREC_SHL_SHR,
+  PREC_ADD_SUB,
+  PREC_MUL_DIV_REM,
   PREC_PAR_BGN,
+  
+  /* PREC_LESS_GREATER, */
+  /* PREC_ADD_SUB, */
+  /* PREC_MUL_DIV, */
+  /* PREC_SHL_SHR, */
+  /* PREC_PAR_BGN, */
   OP_PRECS,
 } OpPrec;
 
@@ -114,7 +147,14 @@ typedef struct {
   Function *func;
   Funcs *fns;
   Longs *gotos;
+  Operations stack;
 } Parser;
+
+#define append_op(parser, operation)            \
+  do {                                          \
+    da_append((parser)->func, (operation));     \
+    da_append(&(parser)->stack, (operation));   \
+  } while (0)
 
 TARE_DEF bool parse_file(Parser *p);
 TARE_DEF StringView sv_from_token(const Token *t);
@@ -129,9 +169,13 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op);
 TARE_DEF bool check_for_continued_expression(Parser *p);
 TARE_DEF OpPrec get_prec_by_op_type(OpType type);
 TARE_DEF OpPrec get_prec_by_special_type(SpecialType s);
+TARE_DEF OpPrec parse_prec_for_next_token(Parser *p);
 TARE_DEF bool is_token_expression(const Token *t);
 
 TARE_DEF bool parse_func_sig(Parser *p);
+
+TARE_DEF bool pop_stack(Parser *p);
+TARE_DEF bool op_has_side_effect(Operation *op);
 
 TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
 TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns);
@@ -147,6 +191,8 @@ TARE_DEF void print_functions(const Parser *p);
 #endif // PARSER_H_
 
 #ifdef PARSER_IMPLEMENTATION
+
+#define TEST_EXPR(expr) printf(#expr " = %zu\n", (size_t) (expr));
 
 TARE_DEF bool parse_file(Parser *p) {
   if (p == NULL) return false;
@@ -166,7 +212,7 @@ TARE_DEF bool parse_file(Parser *p) {
 
   p->func = p->funcs->items;
   p->fns = &fns;
-  
+
   while (true) {
     if (!parse_statement(p)) return false;
     if (!next_token(t)) break;
@@ -195,6 +241,9 @@ TARE_DEF bool parse_file(Parser *p) {
   /* } */
 
   /* if (funcs->items) free(fns.items); */
+
+  p->stack.count = 0;
+  if (p->stack.items) free(p->stack.items);
   
   return true;
 }
@@ -203,14 +252,21 @@ TARE_DEF StringView sv_from_token(const Token *t) {
   return (StringView) {.s = t->f, .l = t->l};
 }
 
+static_assert(OP_TYPES == 41, "update parse_statement");
 TARE_DEF bool parse_statement(Parser *p) {
   if (p == NULL) return false;
   
   Tokenizer *t = p->t;
 
   if (is_token_expression(t->t)) {
+    size_t save = p->func->count;
     if (!parse_expression(p)) return false;
     if (!expect_special(t, END)) return false;
+    if (!pop_stack(p)) return false;
+    if (op_has_side_effect(p->func->items + p->func->count - 1)) {
+      Operation pop = {.start = t->t, .type = OP_POP_FROM_OPS,};
+      da_append(p->func, pop);
+    } else p->func->count = save;
     return true;
   }
   
@@ -227,8 +283,8 @@ TARE_DEF bool parse_statement(Parser *p) {
     case KEY_A: case KEY_S:
     case KEY_I: case KEY_D:
       // TODO: decide if these should be expressions or not
-      if (!parse_expression(p)) return false;
-      if (!expect_special(t, END)) return false;
+      /* if (!parse_expression(p)) return false; */
+      /* if (!expect_special(t, END)) return false; */
       break;
     case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
       op.type = OP_READ_SIZE;
@@ -240,12 +296,19 @@ TARE_DEF bool parse_statement(Parser *p) {
       break;
     case KEY_IF: case KEY_WHILE:
       {
+        size_t save = p->func->count;
         Operation address = {.start = op.start, .type = OP_ADDRESS,
                              .op = t->index};
         op.type = OP_CONDITIONAL;
         da_append(p->func, address);
         if (!next_token(t)) return false;
         if (!parse_expression(p)) return false;
+        if (!pop_stack(p)) return false; // TODO: handle stack
+        bool condition = true;
+        {
+          Operation *cond = p->func->items + p->func->count - 1;
+          if (cond->type == OP_NUM) condition = (bool) (cond->op);
+        }
         if (!expect_special(t, DEF)) return false;
         if (!next_token(t)) return false;
         if (t->t->t == TOKEN_TYPE_SPECIAL) {
@@ -268,7 +331,7 @@ TARE_DEF bool parse_statement(Parser *p) {
           }
           if (!found) return false;
         }
-        
+
         da_append(p->func, op);
         if (op.start->k == KEY_WHILE) {
           da_append(p->gotos, address.op);
@@ -288,6 +351,7 @@ TARE_DEF bool parse_statement(Parser *p) {
         address.start = t->t;
         address.op = t->index;
         da_append(p->func, address);
+        if (!condition) p->func->count = save;
       }
       break;
     case KEY_BREAK: case KEY_CONT:
@@ -298,9 +362,9 @@ TARE_DEF bool parse_statement(Parser *p) {
         size_t count = p->gotos->count;
         size_t *gotos = p->gotos->items;
         
-      if (t->t->k == KEY_BREAK) op.op = gotos[count - 1];
-      else if (t->t->k == KEY_CONT) op.op = gotos[count - 2];
-      else return false;
+        if (t->t->k == KEY_BREAK) op.op = gotos[count - 1];
+        else if (t->t->k == KEY_CONT) op.op = gotos[count - 2];
+        else return false;
       }
       if (!expect_special(t, END)) return false;
       da_append(p->func, op);
@@ -363,6 +427,11 @@ TARE_DEF bool parse_statement(Parser *p) {
     case KEY_MUL: case KEY_DIV:
     case KEY_SHL: case KEY_SHR:
     case KEY_NOT:
+    case KEY_BITWISE_AND: case KEY_BITWISE_OR:
+    case KEY_LOGICAL_AND: case KEY_LOGICAL_OR:
+    case KEY_LESS: case KEY_LESS_EQUAL:
+    case KEY_GREATER: case KEY_GREATER_EQUAL:
+    case KEY_EQUAL: case KEY_NOT_EQUAL:
       if (!parse_expression(p)) return false;
       if (!expect_special(t, END)) return false;
       break;
@@ -406,7 +475,7 @@ TARE_DEF bool parse_statement(Parser *p) {
                 Specials[t->t->s]);
       return false;
     case EQUAL: unimpl("EQUAL"); break;
-    case NOT: 
+    case NOT: case AND: case OR:
       diag_errf(t, t->t,
                 "tare statements do not begin with special token `%c`.\n",
                 Specials[t->t->s]);
@@ -431,6 +500,7 @@ TARE_DEF bool parse_statement(Parser *p) {
   return true;
 }
 
+static_assert(OP_TYPES == 41, "update parse_expression");
 TARE_DEF bool parse_expression(Parser *p) {
   if (p == NULL) return false;
   
@@ -443,7 +513,7 @@ TARE_DEF bool parse_expression(Parser *p) {
   case TOKEN_TYPE_WHOLE_NUM:
     op.type = OP_NUM;
     op.op = t->t->u64;
-    da_append(p->func, op);
+    append_op(p, op);
     if (!check_for_continued_expression(p)) return true;
     if (peek_prev_token(t).t == TOKEN_TYPE_SPECIAL) {
       SpecialType s = peek_prev_token(t).s;
@@ -461,12 +531,15 @@ TARE_DEF bool parse_expression(Parser *p) {
       else if (t->t->k == KEY_B) op.type = OP_PTR_SUB;
       else if (t->t->k == KEY_A) op.type = OP_ELEM_ADD;
       else if (t->t->k == KEY_S) op.type = OP_ELEM_SUB;
-      else return false;
+      else {
+        unimpl("in parse expression");
+        return false;
+      }
       if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       return true;
       break;
     case KEY_N: case KEY_P:
@@ -476,14 +549,17 @@ TARE_DEF bool parse_expression(Parser *p) {
       else if (t->t->k == KEY_P) op.type = OP_PTR_SUB;
       else if (t->t->k == KEY_I) op.type = OP_ELEM_ADD;
       else if (t->t->k == KEY_D) op.type = OP_ELEM_SUB;
-      else return false;
+      else {
+        unimpl("in parse expression");
+        return false;
+      }
       {
         Operation operation = {.start = op.start, .type = OP_NUM, .op = 1};
-        da_append(p->func, operation);
+        append_op(p, operation);
       }
       if (!expect_special(t, PAR_BGN)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       return true;
       break;
     case KEY_R8: case KEY_R16: case KEY_R32: case KEY_R64:
@@ -497,7 +573,10 @@ TARE_DEF bool parse_expression(Parser *p) {
     case KEY_WRITE: case KEY_READ:
       if (t->t->k == KEY_WRITE) op.type = OP_WRITE;
       else if (t->t->k == KEY_READ) op.type = OP_READ;
-      else return false;
+      else {
+        unimpl("in parse expression");
+        return false;
+      }
       if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
@@ -505,7 +584,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       break;
     case KEY_SYSCALL:
       op.type = OP_SYSCALL;
@@ -528,20 +607,23 @@ TARE_DEF bool parse_expression(Parser *p) {
         } else if (s == PAR_END) break;
         else return false;
       }
-      da_append(p->func, op);
+      append_op(p, op);
       break;
     case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
       if (t->t->k == KEY_TAPE) op.type = OP_TAPE;
       else if (t->t->k == KEY_HEAD) op.type = OP_HEAD;
       else if (t->t->k == KEY_BASE) op.type = OP_BASE;
       else if (t->t->k == KEY_INDEX) op.type = OP_INDEX;
-      else return false;
+      else {
+        unimpl("in parse expression");
+        return false;
+      }
+      append_op(p, op);
       if (peek_prev_token(t).t == TOKEN_TYPE_SPECIAL) {
         SpecialType s = peek_prev_token(t).s;
         if (s == DIV || s == MULT || s == ADD || s == SUB
             || s == NOT) return true;
       }
-      da_append(p->func, op);
       break;
     case KEY_CONST: unimpl("KEY_CONST"); break;
 
@@ -552,7 +634,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       return true;
       break;
     case KEY_POP:
@@ -561,19 +643,37 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       break;
 
     case KEY_ADD: case KEY_SUB:
     case KEY_MUL: case KEY_DIV:
     case KEY_SHL: case KEY_SHR:
+    case KEY_BITWISE_AND: case KEY_BITWISE_OR:
+    case KEY_LOGICAL_AND: case KEY_LOGICAL_OR:
+    case KEY_LESS: case KEY_LESS_EQUAL:
+    case KEY_GREATER: case KEY_GREATER_EQUAL:
+    case KEY_EQUAL: case KEY_NOT_EQUAL:
       if (t->t->k == KEY_ADD) op.type = OP_ADD;
       else if (t->t->k == KEY_SUB) op.type = OP_SUB;
       else if (t->t->k == KEY_MUL) op.type = OP_MUL;
       else if (t->t->k == KEY_DIV) op.type = OP_DIV;
       else if (t->t->k == KEY_SHL) op.type = OP_SHL;
       else if (t->t->k == KEY_SHR) op.type = OP_SHR;
-      else return false;
+      else if (t->t->k == KEY_BITWISE_AND) op.type = OP_BITWISE_AND;
+      else if (t->t->k == KEY_BITWISE_OR) op.type = OP_BITWISE_OR;
+      else if (t->t->k == KEY_LOGICAL_AND) op.type = OP_LOGICAL_AND;
+      else if (t->t->k == KEY_LOGICAL_OR) op.type = OP_LOGICAL_OR;
+      else if (t->t->k == KEY_LESS) op.type = OP_LESS;
+      else if (t->t->k == KEY_LESS_EQUAL) op.type = OP_LESS_EQUAL;
+      else if (t->t->k == KEY_GREATER) op.type = OP_GREATER;
+      else if (t->t->k == KEY_GREATER_EQUAL) op.type = OP_GREATER_EQUAL;
+      else if (t->t->k == KEY_EQUAL) op.type = OP_EQUAL;
+      else if (t->t->k == KEY_NOT_EQUAL) op.type = OP_NOT_EQUAL;
+      else {
+        unimpl("in parse expression");
+        return false;
+      }
       if (!expect_special(t, PAR_BGN)) return false;
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
@@ -582,14 +682,14 @@ TARE_DEF bool parse_expression(Parser *p) {
       if (!parse_expression(p)) return false;
       if (!expect_special(t, PAR_END)) return false;
       if (!optimize_expression(p, &op)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       break;
     case KEY_NOT:
       op.type = OP_NOT;
       if (!next_token(t)) return false;
       if (!parse_expression(p)) return false;
       if (!optimize_expression(p, &op)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       break;
     case KEY_DEREF: unimpl("KEY_DEREF"); break;
     
@@ -630,30 +730,11 @@ TARE_DEF bool parse_expression(Parser *p) {
       return false;
     case SEP: unimpl("SEP"); break;
       
-    case DIV: case MULT: case ADD: case SUB: 
+    case DIV: case MULT: case ADD: case SUB: case AND: case OR:
       diag_errf(t, t->t,
                 "tare expressions do not begin with special token `%c`.\n",
                 Specials[t->t->s]);
       return false;
-      /* if (t->t->s == ADD) op.type = OP_ADD; */
-      /* else if (t->t->s == SUB) op.type = OP_SUB; */
-      /* else if (t->t->s == MULT) op.type = OP_MUL; */
-      /* else if (t->t->s == DIV) op.type = OP_DIV; */
-      /* else return false; */
-      /* // TODO: handle shl and shr with special haracters */
-      /* if (!next_token(t)) return false; */
-      /* if (!parse_expression(p)) return false; */
-      /* if (check_for_continued_expression(p)) { */
-      /*   OpPrec current = get_prec_by_op_type(op.type); */
-      /*   OpPrec next = get_prec_by_special_type(peek_next_token(t).s); */
-      /*   if (next > current) { */
-      /*     if (!next_token(t)) return false; */
-      /*     if (!parse_expression(p)) return false; */
-      /*   } */
-      /* } */
-      /* if (!optimize_expression(p, &op)) return false; */
-      /* da_append(p->func, op); */
-      break;
       
     case LESS: unimpl("LESS"); break;
     case GREATER: unimpl("GREATER"); break;
@@ -661,9 +742,16 @@ TARE_DEF bool parse_expression(Parser *p) {
     case NOT:
       op.type = OP_NOT;
       if (!next_token(t)) return false;
+      if (t->t->t == TOKEN_TYPE_SPECIAL) {
+        if (t->t->s == EQUAL) {
+          if (!prev_token(t)) return false;
+          if (!parse_expression_arithmetics(p)) return false;
+          return true;
+        }
+      }
       if (!parse_expression(p)) return false;
       if (!optimize_expression(p, &op)) return false;
-      da_append(p->func, op);
+      append_op(p, op);
       break;
     case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
     }
@@ -674,8 +762,6 @@ TARE_DEF bool parse_expression(Parser *p) {
   case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
-    /* if (p == NULL) return false; */
-    /* Tokenizer *t = p->t; */
     op.type = OP_FUNCALL;
     op.op = t->t->fid;
     if (!expect_special(t, PAR_BGN)) return false;
@@ -688,7 +774,7 @@ TARE_DEF bool parse_expression(Parser *p) {
         if (!next_token(t)) return false;
       }
     }
-    da_append(p->func, op);
+    append_op(p, op);
     break;
   case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
   default: unimpl("default case in parse_expression token type switch"); break;
@@ -699,9 +785,10 @@ TARE_DEF bool parse_expression(Parser *p) {
     if (!parse_expression_arithmetics(p)) return false;
   }
 
-  return true;  
+  return true;
 }
 
+static_assert(OP_TYPES == 41, "update parse_expression_arithmetics");
 TARE_DEF bool parse_expression_arithmetics(Parser *p) {
   if (p == NULL) return false;
   
@@ -729,33 +816,137 @@ TARE_DEF bool parse_expression_arithmetics(Parser *p) {
     return false;
   case SEP: unimpl("SEP"); break;
       
-  case DIV: case MULT: case ADD: case SUB: 
+  case DIV: case MULT: case ADD: case SUB:
     if (t->t->s == ADD) op.type = OP_ADD;
     else if (t->t->s == SUB) op.type = OP_SUB;
     else if (t->t->s == MULT) op.type = OP_MUL;
     else if (t->t->s == DIV) op.type = OP_DIV;
-    else return false;
-    // TODO: handle shl and shr with special haracters
+    else {
+      unimpl("in parse expression arithmetic");
+      return false;
+    }
     if (!next_token(t)) return false;
     if (!parse_expression(p)) return false;
     if (check_for_continued_expression(p)) {
       OpPrec current = get_prec_by_op_type(op.type);
-      OpPrec next = get_prec_by_special_type(peek_next_token(t).s);
+      OpPrec next = parse_prec_for_next_token(p);
       if (next > current) {
         if (!next_token(t)) return false;
         if (!parse_expression_arithmetics(p)) return false;
       }
     }
     if (!optimize_expression(p, &op)) return false;
-    da_append(p->func, op);
+    append_op(p, op);
     break;
       
-  case LESS: unimpl("LESS"); break;
-  case GREATER: unimpl("GREATER"); break;
-  case EQUAL: unimpl("EQUAL"); break;
-  case NOT:
-    diag_errf(t, t->t, "tare expressions arithmetics do not begin with special token `%c`.\n", Specials[t->t->s]);
-    return false;
+  case LESS:
+    op.type = OP_LESS;
+    if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+      if (!expect_special_many(t, LESS, EQUAL)) return false;
+      if (t->t->s == LESS) op.type = OP_SHL;
+      else if (t->t->s == EQUAL) op.type = OP_LESS_EQUAL;
+      else {
+        unimpl("in parse expression arithmetic");
+        return false;
+      }
+    }
+
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = parse_prec_for_next_token(p);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    append_op(p, op);
+    break;
+  case GREATER:
+    op.type = OP_GREATER;
+    if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+      if (!expect_special_many(t, GREATER, EQUAL)) return false;
+      if (t->t->s == GREATER) op.type = OP_SHR;
+      else if (t->t->s == EQUAL) op.type = OP_GREATER_EQUAL;
+      else {
+        unimpl("in parse expression arithmetic");
+        return false;
+      }
+    }
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = parse_prec_for_next_token(p);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    append_op(p, op);
+    break;
+  case EQUAL: case NOT:
+    if (!expect_special(t, EQUAL)) return false;
+    if (op.start->s == EQUAL) op.type = OP_EQUAL;
+    else if (op.start->s == NOT) op.type = OP_NOT_EQUAL;
+    else {
+      unimpl("in parse expression arithmetic");
+      return false;
+    }
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = parse_prec_for_next_token(p);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    append_op(p, op);
+    break;
+
+  case AND:
+    op.type = OP_BITWISE_AND;
+    if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+      if (!expect_special(t, AND)) return false;
+      op.type = OP_LOGICAL_AND;
+    }
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = parse_prec_for_next_token(p);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    append_op(p, op);
+    break;
+  case OR:
+    op.type = OP_BITWISE_OR;
+    if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+      if (!expect_special(t, OR)) return false;
+      op.type = OP_LOGICAL_OR;
+    }
+    if (!next_token(t)) return false;
+    if (!parse_expression(p)) return false;
+    if (check_for_continued_expression(p)) {
+      OpPrec current = get_prec_by_op_type(op.type);
+      OpPrec next = parse_prec_for_next_token(p);
+      if (next > current) {
+        if (!next_token(t)) return false;
+        if (!parse_expression_arithmetics(p)) return false;
+      }
+    }
+    if (!optimize_expression(p, &op)) return false;
+    append_op(p, op);
     break;
   case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
   }
@@ -774,15 +965,17 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
   case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
   case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
-  case OP_TYPES: default: return false;
+  case OP_POP_FROM_OPS: case OP_TYPES: default: return false;
 
-  case OP_ADD:
-  case OP_SUB:
-  case OP_MUL:
-  case OP_DIV:
-  case OP_SHL:
-  case OP_SHR:
-    if (p->func->count < 2) return false;
+  case OP_ADD: case OP_SUB:
+  case OP_MUL: case OP_DIV:
+  case OP_SHL: case OP_SHR:
+  case OP_LESS: case OP_LESS_EQUAL:
+  case OP_GREATER: case OP_GREATER_EQUAL:
+  case OP_EQUAL: case OP_NOT_EQUAL:
+  case OP_BITWISE_AND: case OP_BITWISE_OR:
+  case OP_LOGICAL_AND: case OP_LOGICAL_OR:
+    if (p->stack.count < 2) return false;
     else {
       Operation *second = p->func->items + p->func->count - 1;
       Operation *first = second - 1;
@@ -794,17 +987,35 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
       else if (op->type == OP_DIV) op->op = first->op / second->op;
       else if (op->type == OP_SHL) op->op = first->op << second->op;
       else if (op->type == OP_SHR) op->op = first->op >> second->op;
+      else if (op->type == OP_LESS) op->op = first->op < second->op;
+      else if (op->type == OP_LESS_EQUAL) op->op = first->op <= second->op;
+      else if (op->type == OP_GREATER) op->op = first->op > second->op;
+      else if (op->type == OP_GREATER_EQUAL) op->op = first->op >= second->op;
+      else if (op->type == OP_EQUAL) op->op = first->op == second->op;
+      else if (op->type == OP_NOT_EQUAL) op->op = first->op != second->op;
+      else if (op->type == OP_BITWISE_AND) op->op = first->op & second->op;
+      else if (op->type == OP_BITWISE_OR) op->op = first->op | second->op;
+      else if (op->type == OP_LOGICAL_AND) op->op = first->op && second->op;
+      else if (op->type == OP_LOGICAL_OR) op->op = first->op || second->op;
+      else {
+        Tokenizer *t = p->t;
+        t->t = op->start;
+        unimpl("in optimize expression");
+        return false;
+      }
       p->func->count -= 2;
+      p->stack.count -= 2;
       op->type = OP_NUM;
     }
     break;
   case OP_NOT:
-    if (p->func->count < 1) return false;
+    if (p->stack.count < 1) return false;
     else {
       Operation *operation = p->func->items + p->func->count - 1;
       if (operation->type == OP_NUM) {
         op->op = !operation->op;
         p->func->count--;
+        p->stack.count--;
         op->type = OP_NUM;
       }
     }
@@ -815,7 +1026,7 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
       Tokenizer *t = p->t;
       t->t = op->start;
       unimpl("OP_DEREF optimization");
-      /* return false; */
+      return false;
     }
     break;
   }
@@ -827,10 +1038,21 @@ TARE_DEF bool check_for_continued_expression(Parser *p) {
   Tokenizer *t = p->t;
   if (peek_next_token(t).t != TOKEN_TYPE_SPECIAL) return false;
   SpecialType s = peek_next_token(t).s;
-  if (s != DIV && s != MULT && s != ADD && s != SUB) return false;
-  return true;
+  switch (s) {
+  case PAR_BGN: case PAR_END: case GRP_BGN: case GRP_END:
+  case BLK_BGN: case BLK_END: case DQUOTE: case SQUOTE:
+  case ESC: case SEP: case END: case DOT: case DEF:
+    return false;
+  case DIV: case MULT: case ADD: case SUB:
+  case LESS: case GREATER: case EQUAL: case NOT:
+  case AND: case OR:
+    return true;
+  case SPECIAL_TYPES: return false;
+  }
+  return false;
 }
 
+static_assert(OP_PRECS == 10, "update get_prec_by_op_type");
 TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   switch (type) {
   case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
@@ -839,39 +1061,86 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
   case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
   case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
-  case OP_TYPES:
+  case OP_POP_FROM_OPS: case OP_TYPES:
     return OP_PRECS;
     
   case OP_ADD: case OP_SUB: return PREC_ADD_SUB;
-  case OP_MUL: case OP_DIV: return PREC_MUL_DIV;
-    
-  case OP_SHL: return OP_PRECS;
-  case OP_SHR: return OP_PRECS;
+  case OP_MUL: case OP_DIV: return PREC_MUL_DIV_REM;
+
+  case OP_LESS: case OP_LESS_EQUAL:
+    /* return OP_PRECS; // TODO: fix this */
+  case OP_GREATER: case OP_GREATER_EQUAL:
+    return PREC_LESS_GREATER_LEQUAL_GEQUAL;
+    return OP_PRECS; // TODO: fix this
+  case OP_EQUAL: case OP_NOT_EQUAL:
+    return PREC_EQUAL_NEQUAL;
+    /* return OP_PRECS; // TODO: fix this */
+  case OP_BITWISE_AND: return PREC_BITWISE_AND;
+  case OP_BITWISE_OR: return PREC_BITWISE_OR;
+    /* return OP_PRECS; // TODO: fix this */
+  case OP_LOGICAL_AND: return PREC_LOGICAL_AND;
+  case OP_LOGICAL_OR: return PREC_LOGICAL_OR;
+    /* return OP_PRECS; // TODO: fix this */
+  
+  case OP_SHL: case OP_SHR: return PREC_SHL_SHR;
   case OP_DEREF: return OP_PRECS;
 
-  /* case OP_NOT: return PREC_NOT; */
   case OP_NOT: return OP_PRECS;
   default: return OP_PRECS;
   }
 }
 
+static_assert(OP_PRECS == 10, "update get_prec_by_special_type");
 TARE_DEF OpPrec get_prec_by_special_type(SpecialType s) {
   switch (s) {
   case PAR_BGN: return PREC_PAR_BGN;
   case PAR_END: case GRP_BGN: case GRP_END: case BLK_BGN: case BLK_END:
   case DQUOTE: case SQUOTE: case ESC: case SEP: case END: case DOT: case DEF:
     return OP_PRECS;
-  case DIV: case MULT: return PREC_MUL_DIV;
+  case DIV: case MULT: return PREC_MUL_DIV_REM;
   case ADD: case SUB: return PREC_ADD_SUB;
       
-  case LESS: return OP_PRECS;
-  case GREATER: return OP_PRECS;
+  case LESS: case GREATER:
+    return PREC_LESS_GREATER_LEQUAL_GEQUAL;
+    /* return PREC_LESS_GREATER; */
     
-  /* case NOT: return PREC_NOT; */
-  case NOT: return OP_PRECS;
+  case NOT:
+    return PREC_EQUAL_NEQUAL;
+    /* return OP_PRECS; */
+
+  case AND:
+    return PREC_BITWISE_AND;
+  case OR:
+    return PREC_BITWISE_OR;
+    /* return OP_PRECS; // TODO: fix */
     
-  case EQUAL: case SPECIAL_TYPES: default: return OP_PRECS;
+  case EQUAL:
+    return PREC_EQUAL_NEQUAL;
+  case SPECIAL_TYPES: default: return OP_PRECS;
   }
+}
+
+static_assert(OP_PRECS == 10, "update parse_prec_for_next_token");
+TARE_DEF OpPrec parse_prec_for_next_token(Parser *p) {
+  Tokenizer *t = p->t;
+
+  Token next = peek_next_token(t);
+  SpecialType s = next.s;
+  OpPrec prec = get_prec_by_special_type(s);
+  /* if (prec != PREC_LESS_GREATER) { */
+  if (prec != PREC_LESS_GREATER_LEQUAL_GEQUAL) {
+    if (prec != PREC_BITWISE_OR && prec != PREC_BITWISE_AND)
+    return prec;
+  }
+  
+  // Handle `<<` and `>>`
+  next = peek_forward_token(t, 2);
+  if (next.t != TOKEN_TYPE_SPECIAL) return prec;
+  if (next.s != s) return prec;
+  /* if (prec != PREC_BITWISE_OR && prec != PREC_BITWISE_AND) */
+  if (next.s == OR) return PREC_LOGICAL_OR;
+  if (next.s == AND) return PREC_LOGICAL_AND;
+  return PREC_SHL_SHR;
 }
 
 TARE_DEF bool is_token_expression(const Token *t) {
@@ -908,6 +1177,11 @@ TARE_DEF bool is_token_expression(const Token *t) {
     case KEY_MUL: case KEY_DIV:
     case KEY_SHL: case KEY_SHR:
     case KEY_NOT:
+    case KEY_BITWISE_AND: case KEY_BITWISE_OR:
+    case KEY_LOGICAL_AND: case KEY_LOGICAL_OR:
+    case KEY_LESS: case KEY_LESS_EQUAL:
+    case KEY_GREATER: case KEY_GREATER_EQUAL:
+    case KEY_EQUAL: case KEY_NOT_EQUAL:
       return true;
     case KEY_DEREF:
       return false;
@@ -928,14 +1202,14 @@ TARE_DEF bool is_token_expression(const Token *t) {
       return false;
     case SEP: return false; // ???
       
-    case DIV: case MULT: case ADD: case SUB:
+    case DIV: case MULT: case ADD: case SUB: case AND: case OR:
       /* return true; */
       return false;
       
     case LESS: case GREATER: case EQUAL: return false;
     case NOT:
-      /* return true; */
-      return false;
+      return true;
+      /* return false; */
     case SPECIAL_TYPES: return false;
     }
     break;
@@ -961,6 +1235,105 @@ TARE_DEF bool parse_func_sig(Parser *p) {
   p->func = p->funcs->items + fid;
   p->func->name = sv_from_token(name);
   return true;
+}
+
+TARE_DEF bool pop_stack(Parser *p) {
+  if (p->stack.count < 1) return false;
+  Operation op = p->stack.items[--p->stack.count];
+  bool debug = false;
+  if (debug) printf("--------------------------------------------------\n");
+  if (debug) debug_print_token(p->t, op.start);
+  if (debug) printf("stack before pop: %zu\n", p->stack.count + 1);
+  // add 1 to account for the prefix decrement in the assign  ^
+  switch (op.type) {
+  case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
+    if (!pop_stack(p)) return false;
+    break;
+  case OP_READ_SIZE: return true;
+  case OP_CONDITIONAL:
+    break; // handle properly
+  case OP_GOTO: case OP_ADDRESS: return true;
+  case OP_FUNCALL: return true; // TODO: handle this properly
+  case OP_RET: return true;
+  case OP_WRITE: case OP_READ:
+    if (!pop_stack(p)) return false;
+    if (!pop_stack(p)) return false;
+    break;
+  case OP_SYSCALL:
+    while (op.op--) if (!pop_stack(p)) return false;
+    break;
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+    break;
+    return true;
+  case OP_CONST: return true; // not sure how to handle this yet
+
+  case OP_PUSH: case OP_POP: return true;
+
+  case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_SHL: case OP_SHR:
+    if (!pop_stack(p)) return false;
+    if (!pop_stack(p)) return false;
+    break;
+  case OP_NOT:
+    if (!pop_stack(p)) return false;
+    break;
+  case OP_BITWISE_AND: case OP_BITWISE_OR:
+  case OP_LOGICAL_AND: case OP_LOGICAL_OR:
+  case OP_LESS: case OP_LESS_EQUAL:
+  case OP_GREATER: case OP_GREATER_EQUAL:
+  case OP_EQUAL: case OP_NOT_EQUAL:
+    if (!pop_stack(p)) return false;
+    if (!pop_stack(p)) return false;
+    break;
+  
+  case OP_DEREF: return true; // not sure how to handle this yet
+
+  case OP_ARG: return true; // not sure how to handle this yet
+  case OP_NUM:
+    break;
+    return true;
+  case OP_POP_FROM_OPS: return true; // ????
+  case OP_TYPES: return false; // this should be an error
+  }
+  if (debug) printf("stack after pop: %zu\n", p->stack.count);
+  if (debug) printf("--------------------------------------------------\n\n");
+  return true;
+}
+
+TARE_DEF bool op_has_side_effect(Operation *op) {
+  switch (op->type) {
+  case OP_PTR_ADD: case OP_PTR_SUB: case OP_ELEM_ADD: case OP_ELEM_SUB:
+  case OP_READ_SIZE:
+  case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
+  case OP_FUNCALL: case OP_RET:
+  case OP_WRITE: case OP_READ: case OP_SYSCALL:
+    return true;
+  
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX: return false;
+  case OP_CONST: return true; // ????
+
+  case OP_PUSH: case OP_POP: return true; // ???
+
+  case OP_ADD: case OP_SUB:
+  case OP_MUL: case OP_DIV:
+  case OP_SHL: case OP_SHR:
+  case OP_NOT:
+  case OP_BITWISE_AND: case OP_BITWISE_OR:
+  case OP_LOGICAL_AND: case OP_LOGICAL_OR:
+  case OP_LESS: case OP_LESS_EQUAL:
+  case OP_GREATER: case OP_GREATER_EQUAL:
+  case OP_EQUAL: case OP_NOT_EQUAL:
+    return false;
+  
+  case OP_DEREF: return true; // ????
+
+  case OP_ARG: return true; // ???
+  case OP_NUM: return false;
+
+  case OP_POP_FROM_OPS: return true;
+
+  case OP_TYPES: return false; // should be an error.
+  default: assert(false && "unreachable");
+  }
 }
 
 TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t) {
@@ -1270,12 +1643,25 @@ TARE_DEF const char *op_type_as_string(OpType type) {
   case OP_DIV: return "OP_DIV";
   case OP_SHL: return "OP_SHL";
   case OP_SHR: return "OP_SHR";
+  case OP_LESS: return "OP_LESS";
+  case OP_LESS_EQUAL: return "OP_LESS_EQUAL";
+  case OP_GREATER: return "OP_GREATER";
+  case OP_GREATER_EQUAL: return "OP_GREATER_EQUAL";
+  case OP_EQUAL: return "OP_EQUAL";
+  case OP_NOT_EQUAL: return "OP_NOT_EQUAL";
   case OP_NOT: return "OP_NOT";
+  case OP_BITWISE_AND: return "OP_BITWISE_AND";
+  case OP_BITWISE_OR: return "OP_BITWISE_OR";
+  case OP_LOGICAL_AND: return "OP_LOGICAL_AND";
+  case OP_LOGICAL_OR: return "OP_LOGICAL_OR";
+    
   case OP_DEREF: return "OP_DEREF";
 
   case OP_ARG: return "OP_ARG";
   case OP_NUM: return "OP_NUM";
   
+  case OP_POP_FROM_OPS: return "OP_POP_FROM_OPS";
+    
   case OP_TYPES: return "OP_TYPES";
   default: return "";
   }

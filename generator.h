@@ -76,10 +76,25 @@ TARE_DEF void gen_div_op(Generator *g, FILE *f);
 TARE_DEF void gen_shl_op(Generator *g, FILE *f);
 TARE_DEF void gen_shr_op(Generator *g, FILE *f);
 TARE_DEF void gen_not_op(Generator *g, FILE *f);
+
+TARE_DEF void gen_bitwise(Generator *g, FILE *f);
+TARE_DEF void gen_logical(Generator *g, FILE *f);
+
+TARE_DEF void gen_comparison_op(Generator *g, FILE *f);
+
+TARE_DEF void gen_less_op(Generator *g, FILE *f);
+TARE_DEF void gen_less_equal_op(Generator *g, FILE *f);
+TARE_DEF void gen_greater_op(Generator *g, FILE *f);
+TARE_DEF void gen_greater_equal_op(Generator *g, FILE *f);
+TARE_DEF void gen_equal_op(Generator *g, FILE *f);
+TARE_DEF void gen_not_equal_op(Generator *g, FILE *f);
+
 /* TARE_DEF bool gen_deref_op(Generator *g, FILE *f); */
 
 /* TARE_DEF bool gen_arg_op(Generator *g, FILE *f); */
 TARE_DEF void gen_num_op(Generator *g, FILE *f, bool mul, bool mask);
+
+TARE_DEF void gen_op_pop_from_ops(Generator *g, FILE *f);
 
 TARE_DEF void gen_pop_from_ops_to_reg(Generator *g, FILE *f, const char *reg);
 TARE_DEF void gen_pop_from_ops(Generator *g, FILE *f);
@@ -194,6 +209,9 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   fprintf(f, "read_size_max_2 dq %zu\n", R16_MAX);
   fprintf(f, "read_size_max_4 dq %zu\n", R32_MAX);
   fprintf(f, "read_size_max_8 dq %zu\n", R64_MAX);
+
+  fprintf(f, "false dq 0\n");
+  fprintf(f, "true dq 1\n");
   
   fclose(f);
   if (!gen.fail) printf("Successfully generated file %s\n", output);
@@ -242,10 +260,13 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   }
 
   switch (op->type) {
+    // --------------------------------------------------
+    // TODO: handle pushing and popping useless values    
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
   case OP_PTR_SUB: gen_ptr_sub_op(g, f); break;
   case OP_ELEM_ADD: gen_elem_add_op(g, f); break;
   case OP_ELEM_SUB: gen_elem_add_op(g, f); break;
+    // --------------------------------------------------
   case OP_READ_SIZE: if (!gen_read_size_op(g, f, op->op)) return false; break;
   case OP_CONDITIONAL: gen_conditional_op(g, f); break;
   case OP_GOTO: gen_goto_op(g, f); break;
@@ -273,11 +294,24 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_SHL: gen_shl_op(g, f); break;
   case OP_SHR: gen_shr_op(g, f); break;
   case OP_NOT: gen_not_op(g, f); break;
+  case OP_LESS: case OP_LESS_EQUAL: case OP_GREATER: case OP_GREATER_EQUAL:
+  case OP_EQUAL: case OP_NOT_EQUAL: gen_comparison_op(g, f); break;
+  case OP_BITWISE_AND: case OP_BITWISE_OR: gen_bitwise(g, f); break;
+  case OP_LOGICAL_AND: case OP_LOGICAL_OR: gen_logical(g, f); break;
+
+  /* case OP_LESS: gen_less_op(g, f); break; */
+  /* case OP_LESS_EQUAL: gen_less_equal_op(g, f); break; */
+  /* case OP_GREATER: gen_greater_op(g, f); break; */
+  /* case OP_GREATER_EQUAL: gen_greater_equal_op(g, f); break; */
+  /* case OP_EQUAL: gen_equal_op(g, f); break; */
+  /* case OP_NOT_EQUAL: gen_not_equal_op(g, f); break; */
   case OP_DEREF: unimpl("OP_DEREF"); break;
 
   case OP_ARG: unimpl("OP_ARG"); break;
   case OP_NUM: gen_num_op(g, f, false, false); break; // mul, mask
   
+  case OP_POP_FROM_OPS: gen_op_pop_from_ops(g, f); break;
+    
   case OP_TYPES: unimpl("OP_TYPES"); break;
   }
   
@@ -293,6 +327,8 @@ TARE_DEF void gen_ptr_add_op(Generator *g, FILE *f) {
   fprintf(f, "shl QWORD rax, cl\n");
   }
   fprintf(f, "add QWORD " TAPE_HEAD ", QWORD rax\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -305,6 +341,8 @@ TARE_DEF void gen_ptr_sub_op(Generator *g, FILE *f) {
   fprintf(f, "shl QWORD rax, cl\n");
   }
   fprintf(f, "sub QWORD " TAPE_HEAD ", QWORD rax\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -315,6 +353,8 @@ TARE_DEF void gen_elem_add_op(Generator *g, FILE *f) {
   
   fprintf(f, "mov QWORD rbx, QWORD " TAPE_HEAD "\n");
   fprintf(f, "add QWORD [rbx], QWORD rax\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -325,6 +365,8 @@ TARE_DEF void gen_elem_sub_op(Generator *g, FILE *f) {
   
   fprintf(f, "mov QWORD rbx, QWORD " TAPE_HEAD "\n");
   fprintf(f, "sub QWORD [rbx], QWORD rax\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -360,10 +402,6 @@ TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
   fprintf(f, "cmp QWORD rax, 0\n");
   fprintf(f, "jz addr_%zu\n", g->op->op);
   
-  /* Operation *op = g->op; */
-  /* if (jz) fprintf(f, "jz addr_%zu\n", op->op); */
-  /* else fprintf(f, "jnz addr_%zu\n", op->op); */
-  
   (void)g;
 }
 
@@ -397,6 +435,8 @@ TARE_DEF void gen_write_op(Generator *g, FILE *f) {
   fprintf(f, "mov rdi, 1\n"); // stdout => fd 1
   
   fprintf(f, "syscall\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -412,6 +452,8 @@ TARE_DEF void gen_read_op(Generator *g, FILE *f) {
   fprintf(f, "mov rdi, 0\n"); // stdin => fd 0
   
   fprintf(f, "syscall\n");
+
+  gen_push_to_ops(g, f);
   (void)g; // ehhh???
 }
 
@@ -421,6 +463,8 @@ TARE_DEF void gen_syscall_op(Generator *g, FILE *f) {
   size_t pops = g->op->op;
   while (pops--) gen_pop_from_ops_to_reg(g, f, regs[pops]);
   fprintf(f, "syscall\n");
+
+  gen_push_to_ops(g, f); // what about errno from rdx?
   
   (void)g;
 }
@@ -428,7 +472,6 @@ TARE_DEF void gen_syscall_op(Generator *g, FILE *f) {
 TARE_DEF void gen_tape_op(Generator *g, FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
   fprintf(f, "mov QWORD rax, QWORD [rax]\n");
-  /* fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n"); */
 
   gen_push_to_ops(g, f);
   (void)g;
@@ -463,7 +506,9 @@ TARE_DEF void gen_push_op(Generator *g, FILE *f) {
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "mov QWORD rax, QWORD [rbx]\n");
-  /* fpritnf(f, "push QWORD rax\n"); */
+
+  /* fprintf(f, "push QWORD rax\n"); */
+  
   fprintf(f, "push QWORD [rbx]");
   
   (void)g;
@@ -474,7 +519,7 @@ TARE_DEF void gen_pop_op(Generator *g, FILE *f) {
   /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
   /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
   /* fprintf(f, "mov QWORD rax, QWORD [rbx]\n"); */
-  /* fpritnf(f, "push QWORD rax\n"); */
+  /* fprintf(f, "push QWORD rax\n"); */
   /* fprintf(f, "push QWORD [rbx]"); */
   
   fprintf(f, "pop QWORD rax\n");
@@ -489,12 +534,7 @@ TARE_DEF void gen_add_op(Generator *g, FILE *f) {
   // Second argument
   gen_pop_from_ops(g, f);
   
-  /* // First argument */
-  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
-  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
-  /* fprintf(f, "add QWORD [rbx], QWORD rax\n"); */
-  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
-
+  // First argument
   gen_pop_from_ops_to_reg(g, f, "rcx");
   fprintf(f, "add QWORD rcx, QWORD rax\n");
   gen_push_to_ops_from_reg(g, f, "rcx");
@@ -506,12 +546,7 @@ TARE_DEF void gen_sub_op(Generator *g, FILE *f) {
   // Second argument
   gen_pop_from_ops(g, f);
   
-  /* // First argument */
-  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
-  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
-  /* fprintf(f, "sub QWORD [rbx], QWORD rax\n"); */
-  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
-
+  // First argument
   gen_pop_from_ops_to_reg(g, f, "rcx");
   fprintf(f, "sub QWORD rcx, QWORD rax\n");
   gen_push_to_ops_from_reg(g, f, "rcx");
@@ -524,6 +559,10 @@ TARE_DEF void gen_mul_op(Generator *g, FILE *f) {
   gen_pop_from_ops(g, f);
   
   // First argument
+  /* fprintf(f, "pop QWORD rbx\n"); */
+  /* fprintf(f, "mul QWORD rbx\n"); */
+  /* fprintf(f, "push QOWRD rax\n"); */
+  
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "mul QWORD [rbx]\n");
@@ -537,6 +576,10 @@ TARE_DEF void gen_div_op(Generator *g, FILE *f) {
   gen_pop_from_ops(g, f);
   
   // First argument
+  /* fprintf(f, "pop QWORD rbx\n"); */
+  /* fprintf(f, "div QWORD rbx\n"); */
+  /* fprintf(f, "push QOWRD rax\n"); */
+  
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "div QWORD [rbx]\n");
@@ -545,11 +588,18 @@ TARE_DEF void gen_div_op(Generator *g, FILE *f) {
   (void)g;
 }
 
-TARE_DEF void gen_shl_op(Generator *g, FILE *f) {
+TARE_DEF void gen_shl_op(Generator *g, FILE *f) { // TODO: fix gen shl
   // Second argument
   gen_pop_from_ops(g, f);
   
   // First argument
+  /* fprintf(f, "mov cl, BYTE [rsp]\n"); */
+  
+  /* fprintf(f, "pop QWORD rbx\n"); */
+  /* fprintf(f, "mov cl, bl\n"); */
+  /* fprintf(f, "shl QWORD rax, cl\n"); */
+  /* fprintf(f, "push QWORD rax\n"); */
+
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "mov cl, BYTE [rbx]\n");
@@ -559,11 +609,18 @@ TARE_DEF void gen_shl_op(Generator *g, FILE *f) {
   (void)g;
 }
 
-TARE_DEF void gen_shr_op(Generator *g, FILE *f) {
+TARE_DEF void gen_shr_op(Generator *g, FILE *f) { // TODO: fix gen shr
   // Second argument
   gen_pop_from_ops(g, f);
   
   // First argument
+  /* fprintf(f, "mov cl, BYTE [rsp]\n"); */
+  
+  /* fprintf(f, "pop QWORD rbx\n"); */
+  /* fprintf(f, "mov cl, bl\n"); */
+  /* fprintf(f, "shr QWORD rax, cl\n"); */
+  /* fprintf(f, "push QWORD rax\n"); */
+  
   fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "mov cl, BYTE [rbx]\n");
@@ -579,10 +636,185 @@ TARE_DEF void gen_not_op(Generator *g, FILE *f) {
   fprintf(f, "not QWORD rax\n");
 
   // Append argument
+  /* fprintf(f, "push QWORD rax\n"); */
+  
   fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
   (void)g;
   
+}
+
+TARE_DEF void gen_bitwise(Generator *g, FILE *f) {
+  gen_pop_from_ops(g, f);
+  gen_pop_from_ops_to_reg(g, f, "rcx");
+  
+  const char *inst = "";
+  if (g->op->type == OP_LOGICAL_AND) inst = "and";
+  else if (g->op->type == OP_LOGICAL_OR) inst = "or";
+  else assert(false && "unreachable");
+
+  fprintf(f, "%s QWORD rax, QWORD rdx", inst);
+
+  gen_push_to_ops(g, f);
+
+  (void)g;
+}
+
+TARE_DEF void gen_logical(Generator *g, FILE *f) {
+  gen_pop_from_ops(g, f);
+  
+  fprintf(f, "mov QWORD rcx, QWORD [false]\n");
+  fprintf(f, "cmp QWORD rax, QWORD rcx\n");
+  fprintf(f, "cmovne QWORD rcx, QWORD [true]\n");
+  fprintf(f, "mov QWORD rax, QWORD rcx\n");
+  
+  gen_pop_from_ops_to_reg(g, f, "rdx");
+  
+  fprintf(f, "mov QWORD rbx, QWORD [false]\n");
+  fprintf(f, "cmp QWORD rbx, QWORD rdx\n");
+  fprintf(f, "cmovne QWORD rbx, QWORD [true]\n");
+  fprintf(f, "mov QWORD rdx, QWORD rbx\n");
+
+  const char *inst = "";
+  if (g->op->type == OP_LOGICAL_AND) inst = "and";
+  else if (g->op->type == OP_LOGICAL_OR) inst = "or";
+  else assert(false && "unreachable");
+
+  fprintf(f, "%s QWORD rax, QWORD rdx", inst);
+
+  gen_push_to_ops(g, f);
+  
+  (void)g;
+}
+
+TARE_DEF void gen_comparison_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "pop QWORD rbx\n"); */
+  /* fprintf(f, "cmp QWORD rbx, QWORD rax\n"); */
+  
+  fprintf(f, "mov QWORD rcx, QWORD [false]\n");
+  fprintf(f, "sub QWORD " OPS_HEAD ", 8\n");
+  fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
+  fprintf(f, "cmp QWORD [rbx], QWORD rax\n");
+  const char *inst = "";
+  
+  if (g->op->op == OP_LESS) inst = "cmovl";
+  else if (g->op->op == OP_LESS_EQUAL) inst = "cmovle";
+  else if (g->op->op == OP_GREATER) inst = "cmovg";
+  else if (g->op->op == OP_GREATER_EQUAL) inst = "cmovge";
+  else if (g->op->op == OP_EQUAL) inst = "cmove";
+  else if (g->op->op == OP_NOT_EQUAL) inst = "cmovne";
+  else assert(false && "unreachable");
+
+  /* fprintf(f, "%s QWORD rcx, QWORD [true]\n", inst); */
+  /* fprintf(f, "push QWORD rcx\n"); */
+  
+  fprintf(f, "%s QWORD rcx, QWORD [true]\n", inst);
+  
+  fprintf(f, "mov QWORD [rbx], QWORD rcx\n");
+  fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
+
+  (void)g;
+}
+
+TARE_DEF void gen_less_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmovl QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
+}
+
+TARE_DEF void gen_less_equal_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmovle QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
+}
+
+TARE_DEF void gen_greater_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmovg QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
+}
+
+TARE_DEF void gen_greater_equal_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmovge QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
+}
+
+TARE_DEF void gen_equal_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmove QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
+}
+
+TARE_DEF void gen_not_equal_op(Generator *g, FILE *f) {
+  // Second argument
+  gen_pop_from_ops(g, f);
+  
+  // First argument
+  /* fprintf(f, "mov QWORD rcx, QWORD [false]\n"); */
+  /* fprintf(f, "sub QWORD " OPS_HEAD ", 8\n"); */
+  /* fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n"); */
+  /* fprintf(f, "cmp QWORD [rbx], QWORD rax\n"); */
+  /* fprintf(f, "cmovne QWORD rcx, QWORD [true]\n"); */
+  /* fprintf(f, "mov QWORD [rbx], QWORD rcx\n"); */
+  /* fprintf(f, "add QWORD " OPS_HEAD ", 8\n"); */
+
+  (void)g;
 }
 
 /* TARE_DEF bool gen_deref_op(Generator *g, FILE *f); */
@@ -621,11 +853,15 @@ TARE_DEF void gen_num_op(Generator *g, FILE *f, bool mul, bool mask) {
   
   if (mask) fprintf(f, "and QWORD rax, QWORD " READ_MASK "\n");
 
+  /* fprintf(f, "push QWORD rax\n"); */
+  
   fprintf(f, "mov QWORD rbx, QWORD " OPS_HEAD "\n");
   fprintf(f, "mov QWORD [rbx], QWORD rax\n");
   fprintf(f, "add QWORD " OPS_HEAD ", 8\n");
-  
-  /* fprintf(f, "push QWORD rax\n"); */
+}
+
+TARE_DEF void gen_op_pop_from_ops(Generator *g, FILE *f) {
+  gen_pop_from_ops_to_reg(g, f, "rax");
 }
 
 TARE_DEF void gen_pop_from_ops_to_reg(Generator *g, FILE *f, const char *reg) {

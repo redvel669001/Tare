@@ -243,6 +243,18 @@ TARE_DEF bool gen_from_token(Generator *g, FILE *f) {
     case KEY_SHL: unimpl("KEY_SHL"); break;
     case KEY_SHR: unimpl("KEY_SHR"); break;
     case KEY_NOT: unimpl("KEY_NOT"); break;
+      
+    case KEY_BITWISE_AND: unimpl("KEY_BITWISE_AND"); break;
+    case KEY_BITWISE_OR: unimpl("KEY_BITWISE_OR"); break;
+    case KEY_LOGICAL_AND: unimpl("KEY_LOGICAL_AND"); break;
+    case KEY_LOGICAL_OR: unimpl("KEY_LOGICAL_OR"); break;
+    case KEY_LESS: unimpl("KEY_LESS"); break;
+    case KEY_LESS_EQUAL: unimpl("KEY_LESS_EQUAL"); break;
+    case KEY_GREATER: unimpl("KEY_GREATER"); break;
+    case KEY_GREATER_EQUAL: unimpl("KEY_GREATER_EQUAL"); break;
+    case KEY_EQUAL: unimpl("KEY_EQUAL"); break;
+    case KEY_NOT_EQUAL: unimpl("KEY_NOT_EQUAL"); break;
+      
     case KEY_DEREF: unimpl("KEY_DEREF"); break;
     
     case KEYWORD_TYPES:
@@ -310,6 +322,8 @@ TARE_DEF bool gen_from_token(Generator *g, FILE *f) {
     case GREATER: unimpl("GREATER"); break;
     case EQUAL: unimpl("EQUAL"); break;
     case NOT: unimpl("NOT"); break;
+    case AND: unimpl("AND"); break;
+    case OR: unimpl("OR"); break;
     case SPECIAL_TYPES: unimpl("SPECIAL_TYPES"); break;
     }
     break;

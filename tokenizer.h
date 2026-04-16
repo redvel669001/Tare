@@ -29,10 +29,13 @@ typedef enum {
   GREATER,
   EQUAL,
   NOT,
+  AND,
+  OR,
   SPECIAL_TYPES,
 } SpecialType;
 
-const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!";
+static_assert(SPECIAL_TYPES == 23, "update Specials");
+const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!&|";
 
 typedef enum {
   KEY_F = 0,
@@ -72,50 +75,75 @@ typedef enum {
   KEY_SHL,
   KEY_SHR,
   KEY_NOT,
+  KEY_BITWISE_AND,
+  KEY_BITWISE_OR,
+  KEY_LOGICAL_AND,
+  KEY_LOGICAL_OR,
+  
+  KEY_LESS,
+  KEY_LESS_EQUAL,
+  KEY_GREATER,
+  KEY_GREATER_EQUAL,
+  KEY_EQUAL,
+  KEY_NOT_EQUAL,
+  
   KEY_DEREF,
   
   KEYWORD_TYPES,
 } KeywordType;
 
+static_assert(KEYWORD_TYPES == 46, "update Keywords");
 StringView Keywords[KEYWORD_TYPES] = {
-  [KEY_F]       =  SV_MAKE(f),
-  [KEY_B]       =  SV_MAKE(b),
-  [KEY_N]       =  SV_MAKE(n),
-  [KEY_P]       =  SV_MAKE(p),
-  [KEY_A]       =  SV_MAKE(a),
-  [KEY_S]       =  SV_MAKE(s),
-  [KEY_I]       =  SV_MAKE(i),
-  [KEY_D]       =  SV_MAKE(d),
-  [KEY_R8]      =  SV_MAKE(r8),
-  [KEY_R16]     =  SV_MAKE(r16),
-  [KEY_R32]     =  SV_MAKE(r32),
-  [KEY_R64]     =  SV_MAKE(r64),
-  [KEY_IF]      =  SV_MAKE(if),
-  [KEY_WHILE]   =  SV_MAKE(while),
-  [KEY_BREAK]   =  SV_MAKE(break),
-  [KEY_CONT]    =  SV_MAKE(continue),
-  [KEY_FUNC]    =  SV_MAKE(func),
-  [KEY_RET]     =  SV_MAKE(ret),
-  [KEY_SYSCALL] =  SV_MAKE(syscall),
-  [KEY_WRITE]   =  SV_MAKE(write),
-  [KEY_READ]    =  SV_MAKE(read),
-  [KEY_TAPE]    =  SV_MAKE(tape),
-  [KEY_HEAD]    =  SV_MAKE(head),
-  [KEY_BASE]    =  SV_MAKE(base),
-  [KEY_INDEX]   =  SV_MAKE(index),
-  [KEY_CONST]   =  SV_MAKE(const),
+  [KEY_F]             = SV_MAKE(f),
+  [KEY_B]             = SV_MAKE(b),
+  [KEY_N]             = SV_MAKE(n),
+  [KEY_P]             = SV_MAKE(p),
+  [KEY_A]             = SV_MAKE(a),
+  [KEY_S]             = SV_MAKE(s),
+  [KEY_I]             = SV_MAKE(i),
+  [KEY_D]             = SV_MAKE(d),
+  [KEY_R8]            = SV_MAKE(r8),
+  [KEY_R16]           = SV_MAKE(r16),
+  [KEY_R32]           = SV_MAKE(r32),
+  [KEY_R64]           = SV_MAKE(r64),
+  [KEY_IF]            = SV_MAKE(if),
+  [KEY_WHILE]         = SV_MAKE(while),
+  [KEY_BREAK]         = SV_MAKE(break),
+  [KEY_CONT]          = SV_MAKE(continue),
+  [KEY_FUNC]          = SV_MAKE(func),
+  [KEY_RET]           = SV_MAKE(ret),
+  [KEY_SYSCALL]       = SV_MAKE(syscall),
+  [KEY_WRITE]         = SV_MAKE(write),
+  [KEY_READ]          = SV_MAKE(read),
+  [KEY_TAPE]          = SV_MAKE(tape),
+  [KEY_HEAD]          = SV_MAKE(head),
+  [KEY_BASE]          = SV_MAKE(base),
+  [KEY_INDEX]         = SV_MAKE(index),
+  [KEY_CONST]         = SV_MAKE(const),
   
-  [KEY_PUSH]    =  SV_MAKE(push),
-  [KEY_POP]     =  SV_MAKE(pop),
+  [KEY_PUSH]          = SV_MAKE(push),
+  [KEY_POP]           = SV_MAKE(pop),
   
-  [KEY_ADD]     =  SV_MAKE(add),
-  [KEY_SUB]     =  SV_MAKE(sub),
-  [KEY_MUL]     =  SV_MAKE(mul),
-  [KEY_DIV]     =  SV_MAKE(div),
-  [KEY_SHL]     =  SV_MAKE(shl),
-  [KEY_SHR]     =  SV_MAKE(shr),
-  [KEY_NOT]     =  SV_MAKE(not),
-  [KEY_DEREF]   =  SV_MAKE(deref),
+  [KEY_ADD]           = SV_MAKE(add),
+  [KEY_SUB]           = SV_MAKE(sub),
+  [KEY_MUL]           = SV_MAKE(mul),
+  [KEY_DIV]           = SV_MAKE(div),
+  [KEY_SHL]           = SV_MAKE(shl),
+  [KEY_SHR]           = SV_MAKE(shr),
+  [KEY_NOT]           = SV_MAKE(not),
+  [KEY_BITWISE_AND]   = SV_MAKE(bitand),
+  [KEY_BITWISE_OR]    = SV_MAKE(bitor),
+  [KEY_LOGICAL_AND]   = SV_MAKE(logand),
+  [KEY_LOGICAL_OR]    = SV_MAKE(logor),
+  
+  [KEY_LESS]          = SV_MAKE(less),
+  [KEY_LESS_EQUAL]    = SV_MAKE(lequal),
+  [KEY_GREATER]       = SV_MAKE(greater),
+  [KEY_GREATER_EQUAL] = SV_MAKE(gequal),
+  [KEY_EQUAL]         = SV_MAKE(equal),
+  [KEY_NOT_EQUAL]     = SV_MAKE(nequal),
+  
+  [KEY_DEREF]         = SV_MAKE(deref),
 };
 
 typedef enum {
@@ -226,6 +254,7 @@ TARE_DEF bool next_token(Tokenizer *t);
 TARE_DEF bool prev_token(Tokenizer *t);
 TARE_DEF Token peek_prev_token(const Tokenizer *t);
 TARE_DEF Token peek_next_token(const Tokenizer *t);
+TARE_DEF Token peek_forward_token(const Tokenizer *t, size_t forward);
 
 TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type);
 TARE_DEF bool expect_token_type_two(Tokenizer *t, TokenType a, TokenType b);
@@ -245,7 +274,6 @@ TARE_DEF bool expect_fid(Tokenizer *t);
 TARE_DEF bool expect_num_or_tape(Tokenizer *t);
 TARE_DEF bool expect_vid_or_tape(Tokenizer *t);
 TARE_DEF bool expect_num_or_vid_or_tape(Tokenizer *t);
-/* TARE_DEF bool expect_name_or_start(Tokenizer *t); */
 TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #define expect_special_many(t, ...)                             \
@@ -258,6 +286,7 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #ifdef TOKENIZER_IMPLEMENTATION
 
+static_assert(SPECIAL_TYPES == 23, "update special_index");
 TARE_DEF SpecialType special_index(char c) {
   switch (c) {
   case '(': return PAR_BGN;
@@ -281,6 +310,8 @@ TARE_DEF SpecialType special_index(char c) {
   case '>': return GREATER;
   case '=': return EQUAL;
   case '!': return NOT;
+  case '&': return AND;
+  case '|': return OR;
   default: return SPECIAL_TYPES;
   }
 }
@@ -507,6 +538,11 @@ TARE_DEF Token peek_prev_token(const Tokenizer *t) {
 TARE_DEF Token peek_next_token(const Tokenizer *t) {
   if (!check_bounds(t->index + 1, t->count)) return (Token) {0};
   return t->items[t->index + 1];
+}
+
+TARE_DEF Token peek_forward_token(const Tokenizer *t, size_t forward) {
+  if (!check_bounds(t->index + forward, t->count)) return (Token) {0};
+  return t->items[t->index + forward];
 }
 
 TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type) {
