@@ -723,47 +723,6 @@ TARE_DEF bool expect_fid(Tokenizer *t) {
   return expect_token_type(t, TOKEN_TYPE_FID);
 }
 
-TARE_DEF bool expect_num_or_tape(Tokenizer *t) {
-  if (!expect_token_type_two(t, TOKEN_TYPE_WHOLE_NUM, TOKEN_TYPE_KEYWORD))
-    return false;
-  if (t->t->t == TOKEN_TYPE_WHOLE_NUM) return true;
-  if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
-      t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  diag_errf(t, t->t, "expected whole number or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
-          SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
-          SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
-          TokenTypeNames[t->t->t]);
-  return false;
-}
-
-TARE_DEF bool expect_vid_or_tape(Tokenizer *t) {
-  if (!expect_token_type_two(t, TOKEN_TYPE_VID, TOKEN_TYPE_KEYWORD))
-    return false;
-  if (t->t->t == TOKEN_TYPE_VID) return true;
-  if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
-      t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  diag_errf(t, t->t, "expected variable identifier or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
-          SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
-          SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
-          TokenTypeNames[t->t->t]);
-  return false;
-}
-
-TARE_DEF bool expect_num_or_vid_or_tape(Tokenizer *t) {
-  if (!expect_token_type_three(t, TOKEN_TYPE_WHOLE_NUM, TOKEN_TYPE_VID,
-                               TOKEN_TYPE_KEYWORD)) return false;
-  if (t->t->t == TOKEN_TYPE_WHOLE_NUM) return true;
-  else if (t->t->t == TOKEN_TYPE_VID) return true;
-  
-  if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
-      t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  diag_errf(t, t->t, "expected whole number, variable identifier, or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
-          SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
-          SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
-          TokenTypeNames[t->t->t]);
-  return false;
-}
-
 TARE_DEF bool expect_tid_or_const(Tokenizer *t) {
   if (!expect_token_type_two(t, TOKEN_TYPE_TID, TOKEN_TYPE_KEYWORD)) {
     diag_errf(t, t->t, "expected type identifier or keyword `%.*s` but got %.*s instead\n", SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t));
