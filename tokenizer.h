@@ -34,7 +34,7 @@ typedef enum {
   SPECIAL_TYPES,
 } SpecialType;
 
-static_assert(SPECIAL_TYPES == 23, "update Specials");
+static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `Specials` character array (string).");
 const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!&|";
 
 typedef enum {
@@ -92,7 +92,7 @@ typedef enum {
   KEYWORD_TYPES,
 } KeywordType;
 
-static_assert(KEYWORD_TYPES == 46, "update Keywords");
+static_assert(KEYWORD_TYPES == 46, "Amount of keywords has changed. Please update the `Keywords` StringView array.");
 StringView Keywords[KEYWORD_TYPES] = {
   [KEY_F]             = SV_MAKE(f),
   [KEY_B]             = SV_MAKE(b),
@@ -286,7 +286,7 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #ifdef TOKENIZER_IMPLEMENTATION
 
-static_assert(SPECIAL_TYPES == 23, "update special_index");
+static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `special_index` function to properly account for that.");
 TARE_DEF SpecialType special_index(char c) {
   switch (c) {
   case '(': return PAR_BGN;
