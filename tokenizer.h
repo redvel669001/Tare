@@ -7,6 +7,28 @@
 
 #define TOK_ARG(t) (int) (t)->l, (t)->f
 
+// -------------------------------------------------------------------
+// ----------------------- SPECIAL CHARACTERS: -----------------------
+// -------------------------------------------------------------------
+//
+// Special characters are handled by Tare's tokenizer in the following
+// way: special characters are enumerated in the `SpecialType` enum,
+// which must end with `SPECIAL_TYPES`, begin with the first item set
+// to 0, with values incrementing, meaning `SPECIAL_TYPES` acts as a
+// counter.
+//
+// Then a `Specials` character array (string) is made from that enum,
+// with its characters indexed in positions matching the enum, and the
+// array length being `SPECIAL_TYPES`. While using the enum's counter
+// as the array length can prevent SOME errors at copmile time, it
+// doesn't necessarily always catch them all, hence the static assert
+// right above it.
+//
+// Additionally, a static assert can be found right above the
+// implementation of the `special_index` function, as that's another
+// place that should be modified in case the `SpecialType` enum is
+// modified.
+
 typedef enum {
   PAR_BGN = 0,
   PAR_END,
@@ -36,6 +58,24 @@ typedef enum {
 
 static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `Specials` character array (string).");
 const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!&|";
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ---------------------------- KEYWORDS: ----------------------------
+// -------------------------------------------------------------------
+//
+// Keywords are handled by Tare's tokenizer in the following way:
+// keywords are enumerated in the `KeywordType` enum, which must end
+// with `KEYWORD_TYPES`, begin with the first item set to 0, with
+// values incrementing, meaning `KEYWORD_TYPES` acts as a counter.
+//
+// Then a `Keywords` string view array is made from that enum, with
+// its entries indexed in positions matching the enum, and the array
+// length being `KEYWORD_TYPES`. While using the enum's counter as the
+// array length can prevent SOME errors at compile time, it doesn't
+// necessarily always catch them all, hence the static assert right
+// above it.
 
 typedef enum {
   KEY_F = 0,
@@ -146,6 +186,25 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_DEREF]         = SV_MAKE(deref),
 };
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// --------------------- BUILTIN VARIABLE TYPES: ---------------------
+// -------------------------------------------------------------------
+//
+// Builtin variable types are handled in the following way: builtin
+// variable types are enumerated in the `VariableType` enum, which
+// must end with `TYPES_COUNT`, begin with the first item set to 0,
+// with values incrementing, meaning `KEYWORD_TYPES` acts as a
+// counter.
+//
+// Then a `VariableTypes` string view array is made from that enum, with
+// its entries indexed in positions matching the enum, and the array
+// length being `TYPES_COUNT`. While using the enum's counter as the
+// array length can prevent SOME errors at compile time, it doesn't
+// necessarily always catch them all, hence the static assert right
+// above it.
+
 typedef enum {
   TYPE_U8 = 0,
   TYPE_U16,
@@ -161,6 +220,32 @@ StringView VariableTypes[TYPES_COUNT] = {
   SV_MAKE(u32),
   SV_MAKE(u64),
 };
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// --------------------------- TOKEN TYPES: --------------------------
+// -------------------------------------------------------------------
+//
+// Token types are handled by Tare's tokenizer in the following way:
+// token types are enumerated in the `TokenType` enum, which must end
+// with `TOKEN_TYPES`, begin with the first item set to 0, with values
+// incrementing, meaning `TOKEN_TYPES` acts as a counter.
+//
+// Then a `TokenTypeNames` string array is made from that enum, with
+// its entries indexed in positions matching the enum, and the array
+// length being `TYPES_TYPES`. While using the enum's counter as the
+// array length can prevent SOME errors at compile time, it doesn't
+// necessarily always catch them all, hence the static assert right
+// above it.
+//
+// Additionally, a static assert can be found right above the token
+// struct, to ensure any modification intended to be brought about by
+// modifying the `TokenType` enum is made after the modification.
+//
+// Furthermore, a static assert can be found right above the
+// implementation of the `fill_tokenizer` function, since that may
+// also require modification.
 
 typedef enum {
   TOKEN_TYPE_NAME = 0,
@@ -190,36 +275,83 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
   "function identifier",
 };
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// -------------------------- TOKEN STRUCT: --------------------------
+// -------------------------------------------------------------------
+//
+// The `Token` struct is basically the atomic unit of syntax that tare
+// actually understands. This may come as a surprise given the size of
+// the struct, but it ultimately achieves many things in this manner,
+// allowing for flexibility and easy modification to make parsing far
+// more easy.
+
 static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
-  TokenType t;
-  const char *f;
-  size_t l;
+  TokenType t;     // The token's type.
+  const char *f;   // The first character of the token.
+  size_t l;        // The length of the token.
 
   union {
-    size_t u64;
-    double f64;
+    size_t u64;    // The token's value as a whole number.
+    double f64;    // The token's value as a floating point number.
   };
 
-  SpecialType s;
-  KeywordType k;
+  SpecialType s;   // The token's index as a special character.
+  KeywordType k;   // The token's index as a keyword.
   
-  char c;
-  size_t row, col;
-  size_t jmp;
-  size_t vid;
-  size_t tid;
-  size_t fid;
+  char c;          // The first character of the token. This is
+                   // proving to be unnecessary and simply padding the
+                   // struct unnecessarily.
+  size_t row, col; // The row and column at which the token starts.
+  size_t jmp;      // The token to which this one is connected - for
+                   // example, a `(` token is connected to a `)`
+                   // token.
+  size_t vid;      // The token's index as a variable identifier. This
+                   // should probably be split into global variable
+                   // identifier, local variable identifier, function
+                   // argument varaible identifier, and a return value
+                   // variable identifier, perhaps in a union.
+  size_t tid;      // The token's index as a type identifier. This
+                   // would be more useful once a type system is
+                   // established, even though for now, it's mostly
+                   // unnecessary.
+  size_t fid;      // The token's index as a function identifier.
 } Token;
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ------------------------ TOKENIZER STRUCT: ------------------------
+// -------------------------------------------------------------------
+//
+// The `Tokenizer` struct acts as a fancy dynamic array, in a
+// sense. It is mostly used for looping over the tokens while keeping
+// track of the current token and its index, other than during
+// tokenization, when the lexer is more like a fancy dynamic
+// array.
+
 typedef struct {
-  Token *items;
-  size_t count, capacity;
-  Token *t;
-  size_t index;
-  const char *path;
-  Lexer l;
+  Token *items;     // The tokenizer's tokens. This is a dynamic array.
+  size_t count;     // The amount of current tokens.
+  size_t capacity;  // How much space has been allocated for tokens.
+  Token *t;         // The current token the tokenizer points at. This
+                    // should be equivalent to (items + index).
+  size_t index;     // The tokenizer's current index. This should be
+                    // equivalent to (size_t) (t - items).
+  const char *path; // The path to the file that has been read for tokenization.
+  Lexer l;          // The lexer used for tokenization.
 } Tokenizer;
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// -------------------------- REPORT LEVEL: --------------------------
+// -------------------------------------------------------------------
+//
+// The `ReportLevel` enum is really only important for printing
+// diagnostics, e.g. when encountering an error.
 
 typedef enum {
   REPORT_NOTE,
@@ -227,55 +359,313 @@ typedef enum {
   REPORT_ERROR,
 } ReportLevel;
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ---------------------- TOKENIZATION FUNCTIONS: --------------------
+// -------------------------------------------------------------------
+//
+// These three functions concern tokenization directly, and should be
+// unimportant beyond that stage.
+
+// For a character c, if it is equal to some special character, return
+// that special character's index in the `Specials` character array
+// (string). If it isn't present, simply return SPECIAL_TYPES to
+// indicate failure.
 TARE_DEF SpecialType special_index(char c);
+
+// Read file `path` and lexically analyze it to fill tokenizer
+// `t`. Return true to indicate success, false to indicate
+// failure. Failure could happen either because `path` doesn't exist,
+// or because the text contains an invalid token, or otherwise, a
+// failure could happen because of a failure on the part of the lexer.
 TARE_DEF bool tokenize_file(const char *path, Tokenizer *t);
+
+// Assuming `t` has its lexer prepared, use it to read into the text
+// and fill `t` with tokens. Return true to indicate success, false to
+// indicate failure. Failure could happen because of invalid tokens in
+// the text parsed, or because of a lexer error.
 TARE_DEF bool fill_tokenizer(Tokenizer *t);
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ---------------------- DIAGNOSTICS FUNCTIONS: ---------------------
+// -------------------------------------------------------------------
+//
+// These functions and macros should be used for reporting errors,
+// warnings, or notes, or otherwise for debugging purposes.
+
+// Print the location of token `tok` from tokenizer `t`, to file
+// `stream`, in the format `FILE:ROW:COL: ` (including the whitespace
+// at the end).
 TARE_DEF void print_loc(FILE *stream, const Tokenizer *t, const Token *tok);
+
+// For valid `r`, pick an appropriate output file (`stream`) and
+// an appropriate preamble string (`diag`):
+//
+// REPORT_NOTE: stream = stdout, diag = "note: ",
+// REPORT_WARNING: stream = stderr, diag = "warning: ",
+// REPORT_ERROR: stream = stderr, diag = "error: ",
+//
+// Print the location of `tok` from tokenizer `t` to `stream` (via
+// `print_loc`), then print `diag` to `stream`, then print the
+// formatted message `fmt` and the formatting arguments following it.
+//
+// NOTE: this function can be inconvenient to use due to its excessive
+// parameter count, but there are macros to make usage of it easier,
+// and those should probably be used instead.
 TARE_DEF void report(ReportLevel r, const Tokenizer *t, const Token *tok, const char *fmt, ...) __attribute__ ((format (printf, 4, 5)));
 
+// Print a note diagnosis for token `tok` from tokenizer `t` with
+// formatted message `fmt` and the formatting arguments following it.
 #define diag_notef(t, tok, fmt, ...) \
   report(REPORT_NOTE, (t), (tok), (fmt), __VA_ARGS__)
+
+// Print a warning diagnosis for token `tok` from tokenizer `t` with
+// formatted message `fmt` and the formatting arguments following it.
 #define diag_warnf(t, tok, fmt, ...) \
   report(REPORT_WARNING, (t), (tok), (fmt), __VA_ARGS__)
+
+// Print a error diagnosis for token `tok` from tokenizer `t` with
+// formatted message `fmt` and the formatting arguments following it.
 #define diag_errf(t, tok, fmt, ...) \
   report(REPORT_ERROR, (t), (tok), (fmt), __VA_ARGS__)
 
-#define diag_note(t, tok, fmt, ...) report(REPORT_NOTE, (t), (tok), (fmt))
-#define diag_warn(t, tok, fmt, ...) report(REPORT_WARNING, (t), (tok), (fmt))
-#define diag_err(t, tok, fmt, ...) report(REPORT_ERROR, (t), (tok), (fmt))
+// Print an unformatted note diagnosis `msg` for token `tok` from
+// tokenizer `t`.
+#define diag_note(t, tok, msg, ...) report(REPORT_NOTE, (t), (tok), (msg))
 
+// Print an unformatted warning diagnosis `msg` for token `tok` from
+// tokenizer `t`.
+#define diag_warn(t, tok, msg, ...) report(REPORT_WARNING, (t), (tok), (msg))
+
+// Print an unformatted error diagnosis `msg` for token `tok` from
+// tokenizer `t`.
+#define diag_err(t, tok, msg, ...) report(REPORT_ERROR, (t), (tok), (msg))
+
+// Print token `tok` from tokenizer `t` to stdout (via `print_loc`),
+// with some helpful information such as the token's type and the
+// value of the field relevant to that token type.
 TARE_DEF void debug_print_token(const Tokenizer *t, const Token *tok);
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ---------------------- COMPARISON FUNCTIONS: ----------------------
+// -------------------------------------------------------------------
+//
+// These functions are useful for pre-parsing tokenizer preparations,
+// comparing tokens to other tokens, or to a string view.
+
+// Compare token `tok` with string view `sv`. Return true if the
+// contents are identical (same length AND same characters for that
+// length), return false otherwise.
 TARE_DEF bool tok_sv_cmp(Token *tok, StringView sv);
+
+// Compare token `t1` with token `t2`. Return true if the contents are
+// identical (same length AND same characters for that length), return
+// false otherwise.
 TARE_DEF bool tok_eq(Token *t1, Token *t2);
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ---------------------- ITERATING FUNCTIONS: -----------------------
+// -------------------------------------------------------------------
+//
+// These functions should be used to jump around the tokenizer. Useful
+// for pre-parsing preparation AND for parsing.
+
+// Change tokenizer `t`'s index to `index` and if it is within bounds, set
+// the current token to the one matching the index.
 TARE_DEF bool to_token(Tokenizer *t, size_t index);
+
+// Change tokenizer `t`'s index to 0 and set the current token to the
+// first one,
+//
+// NOTE: This should be equivalent to `to_token(t, 0)`.
 TARE_DEF bool first_token(Tokenizer *t);
+
+// Change tokenizer `t`'s index to one more than the current index and
+// if it is within bounds, set the current token to the one after the
+// one currently pointed at.
+//
+// NOTE: This should be equivalent to `to_token(t, t->index + 1)`.
 TARE_DEF bool next_token(Tokenizer *t);
+
+// Change tokenizer `t`'s index to one less than the current index and
+// if it is within bounds, set the current token to the one before the
+// one currently pointed at.
+//
+// NOTE: This should be equivalent to `to_token(t, t->index - 1)`.
 TARE_DEF bool prev_token(Tokenizer *t);
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// ----------------------- PEEKING FUNCTIONS: ------------------------
+// -------------------------------------------------------------------
+//
+// These functions are useful for looking ahead and looking backwards,
+// without actually committing to jumping around, to better assess the
+// situation while jumping around in expectation functions,
+// pre-parsing tokenizer preparations, or while parsing.
+
+// Check if an index one less than tokenizer `t`'s index is within
+// bounds. If it is, return the token at that prior index by
+// value. Otherwise, return a 0-initialized token to indicate error.
 TARE_DEF Token peek_prev_token(const Tokenizer *t);
+
+// Check if an index one more than tokenizer `t`'s index is within
+// bounds. If it is, return the token at that next index by
+// value. Otherwise, return a 0-initialized token to indicate error.
 TARE_DEF Token peek_next_token(const Tokenizer *t);
+
+// Check if an index `forward` more than tokenizer `t`'s index is
+// within bounds. If it is, return the token at that forward index by
+// value. Otherwise, return a 0-initialized token to indicate error.
 TARE_DEF Token peek_forward_token(const Tokenizer *t, size_t forward);
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// --------------------------- EXPECTATIONS: -------------------------
+// -------------------------------------------------------------------
+//
+// These functions and macros are useful for defining syntax, meaning
+// they are useful during pre-parsing tokenizer preparations and
+// parsing.
+
+// Expect tokenizer `t`'s next token to be of type `type`. Return true
+// to indicate success, false to indicate failure. Failure can happen
+// either because there is no next token, or because the next token's
+// type isn't equal to `type`.
 TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type);
+
+// Expect tokenizer `t`'s next token to be of type `a` or `b`. Return
+// true to indicate success, false to indicate failure. Failure can
+// happen either because there is no next token, or because the next
+// token's type isn't equal to `a` AND isn't equal to `b`.
 TARE_DEF bool expect_token_type_two(Tokenizer *t, TokenType a, TokenType b);
+
+// Expect tokenizer `t`'s next token to be of type `a`, `b`, or
+// `c`. Return true to indicate success, false to indicate
+// failure. Failure can happen either because there is no next token,
+// or because the next token's type isn't equal to `a`, AND isn't
+// equal to `b`, AND isn't equal to `c`.
 TARE_DEF bool expect_token_type_three(Tokenizer *t, TokenType a, TokenType b, TokenType c);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_NAME`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_NAME`.
 TARE_DEF bool expect_name(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_WHOLE_NUM`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_WHOLE_NUM`.
 TARE_DEF bool expect_whole_num(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_FRAC_NUM`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_FRAC_NUM`.
 TARE_DEF bool expect_frac_num(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_KEYWORD`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_KEYWORD`.
 TARE_DEF bool expect_keyword(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_SPECIAL` and expect that next token's special type to
+// be equal to `s``. Return true to indicate success, false to
+// indicate failure. Failure can happen because there is no next
+// token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_SPECIAL`, or because that next token's special type
+// isn't equal to `s`.
 TARE_DEF bool expect_special(Tokenizer *t, SpecialType s);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_SPECIAL` and expect that next token's special type to
+// be equal to one of the special type passed by argument to the
+// function (excluding `SPECIAL_TYPES`, as it is used to indicate the
+// end of the variadic arguments). Return true to indicate success,
+// false to indicate failure. Failure can happen because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_SPECIAL`, or because that next token's special type
+// isn't equal to any of the special types passed by argument to the
+// function (excluding `SPECIAL_TYPES`, as it is used to indicate the
+// end of the variadic arguments).
+
+// NOTE: This function expects the variadic arguments passed to end
+// with the invalid special type index `SPECIAL_TYPES`. For a more
+// convenient API, use the `expect_special_many` macro instead, as it
+// adds the terminating value for you.
 TARE_DEF bool expect_special_many_function(Tokenizer *t, ...);
+
+// Expect tokenizer `t`'s next tokens to be of type
+// `TOKEN_TYPE_SPECIAL` and expect these next tokens' special types to
+// be equal to the special types passed by argument to the function,
+// in sequence (excluding `SPECIAL_TYPES`, as it is used to indicate
+// the end of the variadic arguments). Return true to indicate
+// success, false to indicate failure. Failure can happen because
+// there aren't as many next tokens as there are special types passed
+// by argument to the function (excluding `SPECIAL_TYPES`, as it is
+// used to indicate the end of the variadic arguments), or otherwise
+// because one of the next tokens fails the expectation - either
+// because its type isn't `TOKEN_TYPE_SPECIAL`, or because it is but
+// its special type isn't equal to matching one in the special types
+// passed by argument to the function (excluding `SPECIAL_TYPES`, as
+// it is used to indicate the end of the variadic arguments).
+
+// NOTE: This function expects the variadic arguments passed to end with the
+// invalid special type index `SPECIAL_TYPES`. For a more convenient
+// API, use the `expect_special_many` macro instead, as it adds the
+// terminating value for you.
 TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_CHAR`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_CHAR`.
 TARE_DEF bool expect_char(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_VID`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_VID`.
 TARE_DEF bool expect_vid(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_TID`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_TID`.
 TARE_DEF bool expect_tid(Tokenizer *t);
+
+// Expect tokenizer `t`'s next token to be of type
+// `TOKEN_TYPE_FID`. Return true to indicate success, false to
+// indicate failure. Failure can happen either because there is no
+// next token, or because the next token's type isn't equal to
+// `TOKEN_TYPE_FID`.
 TARE_DEF bool expect_fid(Tokenizer *t);
 
-TARE_DEF bool expect_num_or_tape(Tokenizer *t);
-TARE_DEF bool expect_vid_or_tape(Tokenizer *t);
-TARE_DEF bool expect_num_or_vid_or_tape(Tokenizer *t);
+// Expect tokenizer `t`'s next token to be of type `TOKEN_TYPE_TID` OR
+// `TOKEN_TYPE_KEYWORD` with keyword type of `KEY_CONST`. Return true
+// to indicate success, false to indicate failure. Failure can happen
+// either because there is no next token, or because the next token
+// isn't of type `TOKEN_TYPE_TID` AND either isn't of
+// `TOKEN_TYPE_KEYWORD` or is but its keyword type isn't `KEY_CONST`.
 TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #define expect_special_many(t, ...)                             \
@@ -283,6 +673,8 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #define expect_special_sequence(t, ...)                                 \
   expect_special_sequence_function((t), __VA_ARGS__, SPECIAL_TYPES)
+
+// -------------------------------------------------------------------
 
 #endif // TOKENIZER_H_
 
