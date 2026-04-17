@@ -498,7 +498,7 @@ TARE_DEF void debug_print_token(const Tokenizer *t, const Token *tok) {
     printf("(tid) %.*s (%zu)\n", TOK_ARG(tok), tok->tid); break;
   case TOKEN_TYPE_FID:
     printf("(fid) %.*s (%zu)\n", TOK_ARG(tok), tok->fid); break;
-  case TOKEN_TYPES: printf("UNREACHABLE!\n"); break;
+  case TOKEN_TYPES: default: assert(false && "unreachable");
   }
 }
 
