@@ -28,9 +28,6 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 #define GENERATOR_IMPLEMENTATION
 #include "generator.h"
 
-#define CODEGEN_IMPLEMENTATION
-#include "codegen.h"
-
 #define FLAGS_IMPLEMENTATION
 #include "flags.h"
 
@@ -99,15 +96,6 @@ int main(int argc, char **argv) {
   Redirect redirect = {0};
   close(fdout);
   
-  cmd_append(&cmd, "fasm", paths.fasm_input);
-  if (!run_cmd(&cmd, redirect, true)) return 1;
-
-  cmd_append(&cmd, "chmod", "+x", paths.output_bin);
-  if (!run_cmd(&cmd, redirect, true)) return 1;
-
-  return 0;
-  
-  if (!gen_fasm_no_parser(&t, paths.output)) return 1;
   cmd_append(&cmd, "fasm", paths.fasm_input);
   if (!run_cmd(&cmd, redirect, true)) return 1;
 

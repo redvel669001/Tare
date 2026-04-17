@@ -201,7 +201,6 @@ int main(int argc, char **argv) {
   enum {
     TARE_SOURCE_TARE_C = 0,
     TARE_SOURCE_CMD_H,
-    TARE_SOURCE_CODEGEN_H,
     TARE_SOURCE_DA_H,
     TARE_SOURCE_FLAGS_H,
     TARE_SOURCE_GENERATOR_H,
@@ -221,7 +220,7 @@ int main(int argc, char **argv) {
   };
   
   static_assert(SOURCES_COUNT == PROGRAMS_COUNT);
-  const char *tare_sources[] = {"./tare.c", "./cmd.h", "./codegen.h", "./da.h", "./flags.h", "./generator.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h"};
+    const char *tare_sources[] = {"./tare.c", "./cmd.h", "./da.h", "./flags.h", "./generator.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h"};
   const char *test_sources[] = {"./test.c", "./cmd.h", "./str.h"};
   size_t tare_sources_count = sizeof(tare_sources)/sizeof(const char*);
   size_t test_sources_count = sizeof(test_sources)/sizeof(const char*);
