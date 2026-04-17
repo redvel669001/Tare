@@ -154,6 +154,7 @@ typedef enum {
   TYPES_COUNT,
 } VariableType;
 
+static_assert(TYPES_COUNT == 4, "Amount of built-in variable types has changed. Please update the `VariableTypes` StringView array.");
 StringView VariableTypes[TYPES_COUNT] = {
   SV_MAKE(u8),
   SV_MAKE(u16),
@@ -175,6 +176,7 @@ typedef enum {
   TOKEN_TYPES,
 } TokenType;
 
+static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please update the `TokenTypeNames` string array.");
 const char *TokenTypeNames[TOKEN_TYPES] = {
   "name",
   "whole number",
@@ -188,6 +190,7 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
   "function identifier",
 };
 
+static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
   TokenType t;
   const char *f;
@@ -323,6 +326,7 @@ TARE_DEF bool tokenize_file(const char *path, Tokenizer *t) {
   return fill_tokenizer(t); // Tokenize the text.
 }
 
+static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please update the `fill_tokenizer` function, or otherwise make sure it's working as intended.");
 TARE_DEF bool fill_tokenizer(Tokenizer *t) {
   if (t == NULL || t->l.buf.items == NULL) return false; // Sanity check.
   first_char(&t->l); // Just in case.
