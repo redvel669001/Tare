@@ -207,7 +207,6 @@ typedef struct {
   char c;
   size_t row, col;
   size_t jmp;
-  size_t jmp2;
   size_t vid;
   size_t tid;
   size_t fid;
