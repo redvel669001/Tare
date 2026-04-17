@@ -548,9 +548,6 @@ TARE_DEF Token peek_forward_token(const Tokenizer *t, size_t forward) {
 TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type) {
   if (next_token(t)) {
     if (t->t->t == type) return true;
-    /* print_loc(stderr, t, t->t); */
-    /* fprintf(stderr, "error: expected %s, but got %s instead\n", */
-    /*         TokenTypeNames[type], TokenTypeNames[t->t->t]); */
     diag_errf(t, t->t, "expected %s, but got %s instead\n",
             TokenTypeNames[type], TokenTypeNames[t->t->t]);
     return false;
@@ -558,9 +555,6 @@ TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type) {
   if (!prev_token(t)) {
     fprintf(stderr, "TOKENIZER error!\n");
   }
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected %s after `%.*s`, but it's the last token.\n", */
-  /*         TokenTypeNames[type], TOK_ARG(t->t)); */
   diag_errf(t, t->t, "expected %s after `%.*s`, but it's the last token.\n",
           TokenTypeNames[type], TOK_ARG(t->t));
   return false;
@@ -569,9 +563,6 @@ TARE_DEF bool expect_token_type(Tokenizer *t, TokenType type) {
 TARE_DEF bool expect_token_type_two(Tokenizer *t, TokenType a, TokenType b) {
   if (next_token(t)) {
     if (t->t->t == a || t->t->t == b) return true;
-    /* print_loc(stderr, t, t->t); */
-    /* fprintf(stderr, "error: expected %s or %s, but got %s instead\n", */
-    /*         TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[t->t->t]); */
     diag_errf(t, t->t, "expected %s or %s, but got %s instead\n",
             TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[t->t->t]);
     return false;
@@ -579,10 +570,6 @@ TARE_DEF bool expect_token_type_two(Tokenizer *t, TokenType a, TokenType b) {
   if (!prev_token(t)) {
     fprintf(stderr, "TOKENIZER error!\n");
   }
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected %s or %s after" */
-  /*         " `%.*s`, but it's the last token.\n", */
-  /*         TokenTypeNames[a], TokenTypeNames[b], TOK_ARG(t->t)); */
   diag_errf(t, t->t,
             "expected %s or %s after `%.*s`, but it's the last token.\n",
             TokenTypeNames[a], TokenTypeNames[b], TOK_ARG(t->t));
@@ -592,10 +579,6 @@ TARE_DEF bool expect_token_type_two(Tokenizer *t, TokenType a, TokenType b) {
 TARE_DEF bool expect_token_type_three(Tokenizer *t, TokenType a, TokenType b, TokenType c) {
   if (next_token(t)) {
     if (t->t->t == a || t->t->t == b || t->t->t == c) return true;
-    /* print_loc(stderr, t, t->t); */
-    /* fprintf(stderr, "error: expected %s, %s, or %s, but got %s instead\n", */
-    /*         TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[c], */
-    /*         TokenTypeNames[t->t->t]); */
     diag_errf(t, t->t, "expected %s, %s, or %s, but got %s instead\n",
             TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[c],
             TokenTypeNames[t->t->t]);
@@ -604,11 +587,6 @@ TARE_DEF bool expect_token_type_three(Tokenizer *t, TokenType a, TokenType b, To
   if (!prev_token(t)) {
     fprintf(stderr, "TOKENIZER error!\n");
   }
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected %s, %s, or %s after" */
-  /*         " `%.*s`, but it's the last token.\n", */
-  /*         TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[c], */
-  /*         TOK_ARG(t->t)); */
   diag_errf(t, t->t, "error: expected %s, %s, or %s after `%.*s`, but it's the last token.\n",
             TokenTypeNames[a], TokenTypeNames[b], TokenTypeNames[c],
             TOK_ARG(t->t));
@@ -634,9 +612,6 @@ TARE_DEF bool expect_keyword(Tokenizer *t) {
 TARE_DEF bool expect_special(Tokenizer *t, SpecialType s) {
   if (!expect_token_type(t, TOKEN_TYPE_SPECIAL)) t->t->s = SPECIAL_TYPES;
   if (t->t->s == s) return true;
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected %c but got %c instead.\n", */
-  /*         Specials[s], t->t->c); */
   diag_errf(t, t->t, "expected `%c` but got `%.*s` instead.\n",
             Specials[s], TOK_ARG(t->t));
   return false;
@@ -661,8 +636,6 @@ TARE_DEF bool expect_special_many_function(Tokenizer *t, ...) {
 
   s = va_arg(args, SpecialType);
 
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected "); */
   diag_err(t, t->t, "expected ");
   for (size_t i = 0; i < count; i++) {
     const char ch = Specials[s];
@@ -710,8 +683,6 @@ TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...) {
   
   s = va_arg(args, SpecialType);
   
-  /* print_loc(stderr, t, begin); */
-  /* fprintf(stderr, "error: expected "); */
   diag_err(t, begin, "expected ");
   for (size_t i = 0; i < count; i++) {
     const char ch = Specials[s];
@@ -754,12 +725,6 @@ TARE_DEF bool expect_num_or_tape(Tokenizer *t) {
   if (t->t->t == TOKEN_TYPE_WHOLE_NUM) return true;
   if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
       t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected whole number or keyword" */
-  /*         " `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n", */
-  /*         SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]), */
-  /*         SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]), */
-  /*         TokenTypeNames[t->t->t]); */
   diag_errf(t, t->t, "expected whole number or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
           SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
           SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
@@ -773,12 +738,6 @@ TARE_DEF bool expect_vid_or_tape(Tokenizer *t) {
   if (t->t->t == TOKEN_TYPE_VID) return true;
   if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
       t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected variable identifier or keyword" */
-  /*         " `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n", */
-  /*         SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]), */
-  /*         SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]), */
-  /*         TokenTypeNames[t->t->t]); */
   diag_errf(t, t->t, "expected variable identifier or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
           SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
           SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
@@ -794,13 +753,6 @@ TARE_DEF bool expect_num_or_vid_or_tape(Tokenizer *t) {
   
   if (t->t->k == KEY_TAPE || t->t->k == KEY_HEAD ||
       t->t->k == KEY_BASE || t->t->k == KEY_INDEX) return true;
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected whole number, variable identifier," */
-  /*         " or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but " */
-  /*         "got %s instead\n", */
-  /*         SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]), */
-  /*         SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]), */
-  /*         TokenTypeNames[t->t->t]); */
   diag_errf(t, t->t, "expected whole number, variable identifier, or keyword `%.*s`, `%.*s`, `%.*s`, or `%.*s`, but got %s instead\n",
           SV_ARG(Keywords[KEY_TAPE]), SV_ARG(Keywords[KEY_HEAD]),
           SV_ARG(Keywords[KEY_BASE]), SV_ARG(Keywords[KEY_INDEX]),
@@ -810,10 +762,6 @@ TARE_DEF bool expect_num_or_vid_or_tape(Tokenizer *t) {
 
 TARE_DEF bool expect_tid_or_const(Tokenizer *t) {
   if (!expect_token_type_two(t, TOKEN_TYPE_TID, TOKEN_TYPE_KEYWORD)) {
-    /* print_loc(stderr, t, t->t); */
-    /* fprintf(stderr, "error: expected type identifier or keyword" */
-    /*         " `%.*s` but got %.*s instead\n", */
-    /*         SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t)); */
     diag_errf(t, t->t, "expected type identifier or keyword `%.*s` but got %.*s instead\n", SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t));
     return false;
   }
@@ -821,10 +769,6 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t) {
   if (t->t->t == TOKEN_TYPE_TID) return true;
   if (t->t->k == KEY_CONST) return true;
   
-  /* print_loc(stderr, t, t->t); */
-  /* fprintf(stderr, "error: expected type identifier or keyword" */
-  /*         " `%.*s` but got %.*s instead\n", */
-  /*         SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t)); */
   diag_errf(t, t->t, "expected type identifier or keyword `%.*s` but got %.*s instead\n", SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t));
   return false;
 }
