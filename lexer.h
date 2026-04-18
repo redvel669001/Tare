@@ -11,9 +11,6 @@ typedef struct {
   size_t col;
   
   char c;
-  
-  /* const char *f; */
-  /* size_t l; */
 } Lexer;
 
 TARE_DEF bool is_digit(char c);
