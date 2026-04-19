@@ -323,11 +323,9 @@ typedef struct {
 // -------------------------- TOKEN STRUCT: --------------------------
 // -------------------------------------------------------------------
 //
-// The `Token` struct is basically the atomic unit of syntax that tare
-// actually understands. This may come as a surprise given the size of
-// the struct, but it ultimately achieves many things in this manner,
-// allowing for flexibility and easy modification to make parsing far
-// more easy.
+// The `Token` struct is the atomic unit of syntax that tare actually
+// understands. This is to say, tokenization in tare is turning text
+// into syntax that can more easily be reasoned about.
 
 static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
