@@ -330,7 +330,8 @@ typedef struct {
 static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
   TokenType t;     // The token's type.
-  union {
+  
+  union {          // This is here because to make padding unnecessary.
     SpecialType s; // The token's index as a special character.
     KeywordType k; // The token's index as a keyword.
   };
