@@ -754,13 +754,14 @@ TARE_DEF SpecialType special_index(char c) {
 TARE_DEF bool tokenize_file(const char *path, Tokenizer *t) {
   if (t == NULL || path == NULL) return false; // Sanity check.
   t->path = path;
-  if (!read_file(path, &t->l.buf)) return false;
+  /* if (!read_file(path, &t->l.buf)) return false; */
+  if (!read_file_to_lexer(path, &t->l)) return false;
   return fill_tokenizer(t); // Tokenize the text.
 }
 
 static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please update the `fill_tokenizer` function, or otherwise make sure it's working as intended.");
 TARE_DEF bool fill_tokenizer(Tokenizer *t) {
-  if (t == NULL || t->l.buf.items == NULL) return false; // Sanity check.
+  if (t == NULL || t->l.items == NULL) return false; // Sanity check.
   first_char(&t->l); // Just in case.
   do { // Do while cause it fits this use case.
     if (isspace(*t->l.c)) continue; // Skip whitespace.
@@ -881,7 +882,7 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
 
 TARE_DEF Loc get_token_loc(const Tokenizer *t, const Token *tok) {
   Loc loc = {.row = 1, .col = 1};
-  for (const char *point = t->l.buf.items; point < tok->f; point++) {
+  for (const char *point = t->l.items; point < tok->f; point++) {
     if (*point == '\n') {
       loc.row++;
       loc.col = 1;
