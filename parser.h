@@ -9,10 +9,19 @@ typedef struct {
   size_t capacity;
 } Operations;
 
+typedef enum {
+  SCOPE_GLOBAL,
+  SCOPE_LOCAL,
+  SCOPE_ARGUMENT,
+  SCOPE_RETURN,
+  SCOPE_TYPES,
+} ScopeType;
+
 typedef struct {
-  StringView name;
+  ScopeType scope;
   size_t vid;
   size_t tid;
+  StringView name;
 } Var;
 
 typedef struct {
@@ -21,22 +30,22 @@ typedef struct {
   size_t capacity;
 } Vars;
 
-typedef struct {
-  StringView name;
-  Token *first;
+/* typedef struct { */
+/*   StringView name; */
+/*   Token *first; */
   
-  Vars args;
-  Vars rets;
+/*   Vars args; */
+/*   Vars rets; */
   
-  size_t start;
-  size_t end;
-} Func;
+/*   size_t start; */
+/*   size_t end; */
+/* } Func; */
 
-typedef struct {
-  Func *items;
-  size_t count;
-  size_t capacity;
-} Funcs;
+/* typedef struct { */
+/*   Func *items; */
+/*   size_t count; */
+/*   size_t capacity; */
+/* } Funcs; */
 
 typedef enum {
   OP_PTR_ADD = 0,
@@ -123,10 +132,17 @@ struct Operation {
 };
 
 typedef struct {
+  StringView name;
+
+  Vars args;
+  Vars rets;
+
+  size_t start;
+  size_t end;
+  
   Operation *items;
   size_t count;
   size_t capacity;
-  StringView name;
 } Function;
 
 typedef struct {
@@ -145,7 +161,7 @@ typedef struct {
   Tokenizer *t;
   Functions *funcs;
   Function *func;
-  Funcs *fns;
+  /* Funcs *fns; */
   Longs *gotos;
   Operations stack;
 } Parser;
@@ -178,9 +194,9 @@ TARE_DEF bool pop_stack(Parser *p);
 TARE_DEF bool op_has_side_effect(Operation *op);
 
 TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
-TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns);
-TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns);
-TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args);
+TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Functions *fns);
+TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns);
+TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args);
 TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t);
 
 TARE_DEF const char *op_type_as_string(OpType type); // For debugging.
@@ -202,15 +218,18 @@ TARE_DEF bool parse_file(Parser *p) {
   patch_tokenizer_builtin_types(t);
   if (!patch_tokenizer_bgn_end(t)) return false;
   
-  Funcs fns = {0};
-  Func main = {.name = SV_MAKE(main)};
-  da_append(&fns, main);
-  if (!patch_tokenizer_funcs(t, &fns)) return false;
+  /* Funcs fns = {0}; */
+  /* Func main = {.name = SV_MAKE(main)}; */
+  /* da_append(&fns, main); */
 
-  for (size_t i = 0; i < fns.count; i++) da_append(p->funcs, (Function) {0});
+  Function main = {.name = SV_MAKE(main)};
+  da_append(p->funcs, main);
+  if (!patch_tokenizer_funcs(t, p->funcs)) return false;
+
+  /* for (size_t i = 0; i < fns.count; i++) da_append(p->funcs, (Function) {0}); */
 
   p->func = p->funcs->items;
-  p->fns = &fns;
+  /* p->fns = &fns; */
 
   while (true) {
     if (!parse_statement(p)) return false;
@@ -486,7 +505,12 @@ TARE_DEF bool parse_statement(Parser *p) {
     break;
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
-  case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
+    
+  case TOKEN_TYPE_GVID: unimpl("TOKEN_TYPE_GVID"); break;
+  case TOKEN_TYPE_LVID: unimpl("TOKEN_TYPE_LVID"); break;
+  case TOKEN_TYPE_RVID: unimpl("TOKEN_TYPE_RVID"); break;
+  case TOKEN_TYPE_AVID: unimpl("TOKEN_TYPE_AVID"); break;
+    
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
     if (!parse_expression(p)) return false;
@@ -758,7 +782,12 @@ TARE_DEF bool parse_expression(Parser *p) {
     break;
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
-  case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
+    
+  case TOKEN_TYPE_GVID: unimpl("TOKEN_TYPE_GVID"); break;
+  case TOKEN_TYPE_LVID: unimpl("TOKEN_TYPE_LVID"); break;
+  case TOKEN_TYPE_RVID: unimpl("TOKEN_TYPE_RVID"); break;
+  case TOKEN_TYPE_AVID: unimpl("TOKEN_TYPE_AVID"); break;
+    
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
     op.type = OP_FUNCALL;
@@ -1214,7 +1243,12 @@ TARE_DEF bool is_token_expression(const Token *t) {
     break;
   case TOKEN_TYPE_STRING: return false;
   case TOKEN_TYPE_CHAR: return false;
-  case TOKEN_TYPE_VID: return false;
+
+  case TOKEN_TYPE_GVID: return false;
+  case TOKEN_TYPE_LVID: return false;
+  case TOKEN_TYPE_RVID: return false;
+  case TOKEN_TYPE_AVID: return false;
+    
   case TOKEN_TYPE_TID: return false;
   case TOKEN_TYPE_FID: return true;
   case TOKEN_TYPES: default: return false;
@@ -1228,7 +1262,9 @@ TARE_DEF bool parse_func_sig(Parser *p) {
   if (!expect_fid(t)) return false;
   const Token *name = t->t;
   size_t fid = t->t->fid;
-  Func *fn = p->fns->items + fid;
+  /* Func *fn = p->fns->items + fid; */
+  Function *fn = p->funcs->items + fid;
+  
   // Should probably become more involved than this.
   if (!to_token(t, fn->start)) return false;
   p->func = p->funcs->items + fid;
@@ -1347,7 +1383,7 @@ TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t) {
   }
 }
 
-TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns) {
+TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Functions *fns) {
   if (t == NULL) return false;
   if (fns == NULL) return false;
   
@@ -1371,16 +1407,17 @@ TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns) {
   return to_token(t, point);
 }
 
-TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns) {
+TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns) {
   Token *first = t->t;
   // Get the function's name.
   if (!expect_name(t)) return false;
-  Func fn = {.name = sv_from_token(t->t), .first = first};
+  /* Function fn = {.name = sv_from_token(t->t), .first = first}; */
+  Function fn = {.name = sv_from_token(t->t)};
   size_t fid = fns->count;
   if (sv_eq(fn.name, fns->items[0].name)) fid = 0;
   assert(fns->count > 0 && "please don't corrupt the memory");
   /* da_append(fns, fn); */
-  Func *f = fns->items + fid;
+  Function *f = fns->items + fid;
   if (fid != 0) da_append(fns, fn);
   t->t->t = TOKEN_TYPE_FID;
   t->t->fid = fid;
@@ -1463,8 +1500,9 @@ TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns) {
   return true;
 }
 
-TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args) {
+TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
   size_t vid = 0;
+  ScopeType scope = 0;
   Token *end = t->items + fn->end;
 
   while (t->t->s != PAR_END) {
@@ -1478,22 +1516,57 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args) {
     }
     size_t tid = t->t->tid;
     if (!expect_name(t)) return false;
-    /* if (args) vid = fn->args.count; */
-    /* else vid = fn->rets.count; */
-    vid = fn->args.count + fn->rets.count; // TODO: make this actually work
+    if (args) {
+      vid = fn->args.count;
+      scope = SCOPE_ARGUMENT;
+    }
+    else {
+      vid = fn->rets.count;
+      scope = SCOPE_RETURN;
+    }
+    /* vid = fn->args.count + fn->rets.count; // TODO: make this actually work */
     
     Var arg = {
       .name = sv_from_token(t->t),
       .vid = vid,
       .tid = tid,
+      .scope = scope,
     };
       
     for (Token *tok = t->t; tok < end; tok++) {
       if (tok->k == KEY_RET) break;
       if (tok->t != TOKEN_TYPE_NAME) continue;
       if (tok_eq(t->t, tok)) {
-        tok->t = TOKEN_TYPE_VID;
-        tok->vid = arg.vid;
+        /* tok->t = TOKEN_TYPE_VID; */
+        /* tok->vid = arg.vid; */
+        switch (scope) {
+        case SCOPE_GLOBAL:
+          assert(false && "SCOPE_GLOBAL should be impossible");
+          /* unimpl("SCOPE_GLOBAL"); */
+          break;
+        case SCOPE_LOCAL:
+          assert(false && "SCOPE_LOCAL should be impossible");
+          /* unimpl("SCOPE_LOCAL"); */
+          break;
+        case SCOPE_ARGUMENT:
+          tok->t = TOKEN_TYPE_AVID;
+          tok->avid = arg.vid;
+          /* assert(false && "SCOPE_ARGUMENT should be impossible"); */
+          /* unimpl("SCOPE_ARGUMENT"); */
+          break;
+        case SCOPE_RETURN:
+          tok->t = TOKEN_TYPE_RVID;
+          tok->rvid = arg.vid;
+          /* assert(false && "SCOPE_RETURN should be impossible"); */
+          /* unimpl("SCOPE_RETURN"); */
+          break;
+        case SCOPE_TYPES:
+          assert(false && "SCOPE_TYPES should be impossible");
+          /* unimpl("SCOPE_TYPES"); */
+          break;
+        }
+        /* diag_warn(t, tok, "stuff\n"); */
+        /* assert(false && "oops"); */
       }
     }
 

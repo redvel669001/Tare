@@ -38,7 +38,7 @@ typedef struct {
   Operation *op;
   Functions *fns;
   size_t fni; // current function index
-  Funcs *funcs;
+  /* Funcs *funcs; */
 } Generator;
 
 TARE_DEF bool gen_fasm(Parser *p, const char *output);
@@ -137,7 +137,7 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   Longs gotos = {0};
   Generator gen = {.longs = &longs, .t = t,
                    .fn = fns->items, .op = fns->items->items, .fns = fns,
-                   .funcs = p->fns, .gotos = &gotos};
+                   .gotos = &gotos};
 
   // Boilerplate
   fprintf(f, "format ELF64 executable 3\n");

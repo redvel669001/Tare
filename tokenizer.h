@@ -279,13 +279,18 @@ typedef enum {
   TOKEN_TYPE_SPECIAL,
   TOKEN_TYPE_STRING,
   TOKEN_TYPE_CHAR,
-  TOKEN_TYPE_VID,
+  
+  TOKEN_TYPE_GVID,
+  TOKEN_TYPE_LVID,
+  TOKEN_TYPE_RVID,
+  TOKEN_TYPE_AVID,
+  
   TOKEN_TYPE_TID,
   TOKEN_TYPE_FID,
   TOKEN_TYPES,
 } TokenType;
 
-static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please update the `TokenTypeNames` string array.");
+static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please update the `TokenTypeNames` string array.");
 const char *TokenTypeNames[TOKEN_TYPES] = {
   "name",
   "whole number",
@@ -302,6 +307,19 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
+// --------------------------- LOC STRUCT: ---------------------------
+// -------------------------------------------------------------------
+//
+// The `Loc` struct is used for diagnostics. Since reporting doesn't need to happen very frequently, there's no need to bload the `Token` struct with 16 additional bytes. Rather, the location can be calculated, when necessary, by the 
+
+typedef struct {
+  size_t row; // The line at which a token starts.
+  size_t col; // How many characters into the line until the token starts.
+} Loc;
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
 // -------------------------- TOKEN STRUCT: --------------------------
 // -------------------------------------------------------------------
 //
@@ -311,37 +329,38 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
 // allowing for flexibility and easy modification to make parsing far
 // more easy.
 
-static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
+static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
   TokenType t;     // The token's type.
+  union {
+    SpecialType s; // The token's index as a special character.
+    KeywordType k; // The token's index as a keyword.
+  };
+
   const char *f;   // The first character of the token.
   size_t l;        // The length of the token.
 
   union {
-    size_t u64;    // The token's value as a whole number.
-    double f64;    // The token's value as a floating point number.
-  };
+    union {
+      size_t u64;  // The token's value as a whole number.
+      double f64;  // The token's value as a floating point number.
+    };
 
-  SpecialType s;   // The token's index as a special character.
-  KeywordType k;   // The token's index as a keyword.
-  
-  char c;          // The first character of the token. This is
-                   // proving to be unnecessary and simply padding the
-                   // struct unnecessarily.
-  size_t row, col; // The row and column at which the token starts.
-  size_t jmp;      // The token to which this one is connected - for
+    union {
+      size_t jmp;  // The token to which this one is connected - for
                    // example, a `(` token is connected to a `)`
                    // token.
-  size_t vid;      // The token's index as a variable identifier. This
-                   // should probably be split into global variable
-                   // identifier, local variable identifier, function
-                   // argument varaible identifier, and a return value
-                   // variable identifier, perhaps in a union.
-  size_t tid;      // The token's index as a type identifier. This
+      size_t gvid; // Token's index as a global variable identifier.
+      size_t lvid; // Token's index as a local variable identifier.
+      size_t rvid; // Token's index as a return value identifier.
+      size_t avid; // Token's index as a function arg identifier.
+      size_t tid;  // The token's index as a type identifier. This
                    // would be more useful once a type system is
                    // established, even though for now, it's mostly
                    // unnecessary.
-  size_t fid;      // The token's index as a function identifier.
+      size_t fid;  // The token's index as a function identifier.
+    };
+  };
 } Token;
 
 // -------------------------------------------------------------------
@@ -419,6 +438,10 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t);
 //
 // These functions and macros should be used for reporting errors,
 // warnings, or notes, or otherwise for debugging purposes.
+
+// Get the row and col of token `tok` from tokenizer `t`, in the form
+// of struct `Loc`.
+TARE_DEF Loc get_token_loc(const Tokenizer *t, const Token *tok);
 
 // Print the location of token `tok` from tokenizer `t`, to file
 // `stream`, in the format `FILE:ROW:COL: ` (including the whitespace
@@ -668,7 +691,7 @@ TARE_DEF bool expect_char(Tokenizer *t);
 // indicate failure. Failure can happen either because there is no
 // next token, or because the next token's type isn't equal to
 // `TOKEN_TYPE_VID`.
-TARE_DEF bool expect_vid(Tokenizer *t);
+/* TARE_DEF bool expect_vid(Tokenizer *t); */
 
 // Expect tokenizer `t`'s next token to be of type
 // `TOKEN_TYPE_TID`. Return true to indicate success, false to
@@ -741,18 +764,16 @@ TARE_DEF bool tokenize_file(const char *path, Tokenizer *t) {
   return fill_tokenizer(t); // Tokenize the text.
 }
 
-static_assert(TOKEN_TYPES == 10, "Amount of token types has changed. Please update the `fill_tokenizer` function, or otherwise make sure it's working as intended.");
+static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please update the `fill_tokenizer` function, or otherwise make sure it's working as intended.");
 TARE_DEF bool fill_tokenizer(Tokenizer *t) {
   if (t == NULL || t->l.buf.items == NULL) return false; // Sanity check.
   first_char(&t->l); // Just in case.
   do { // Do while cause it fits this use case.
-    if (isspace(t->l.c)) continue; // Skip whitespace.
+    if (isspace(*t->l.c)) continue; // Skip whitespace.
     
     // Token still mostly zero-initialized, but with some fields
     // filled in to avoid needless repetition.
-    Token tok = {.f = t->l.buf.items + t->l.i, .l = 1, .c = t->l.c,
-                 .row = t->l.row + 1, .col = t->l.col + 1,
-                 .s = special_index(t->l.c)};
+    Token tok = {.f = t->l.c, .l = 1, .s = special_index(*t->l.c)};
 
     // Try to look ahead fo check for an indication of a fractional
     // number. May expand to look for other indications of a number.
@@ -763,16 +784,15 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
       // after it. Similarly, the length, the first character, the
       // row, and the col, should also reflect that fact.
       tok.f++, tok.l--;
-      if (!lexer_advance_char_forward(&t->l)) return false;
-      tok.c = t->l.c, tok.row = t->l.row + 1, tok.col = t->l.col + 1;
-      while (t->l.c != Specials[DQUOTE]) { // Handle the rest of the string.
+      if (!next_char(&t->l)) return false;
+      while (*t->l.c != Specials[DQUOTE]) { // Handle the rest of the string.
         tok.l++;
-        if (!lexer_advance_char_forward(&t->l)) break;
+        if (!next_char(&t->l)) break;
         // Skip escaped charcters to not end the string too early.
-        if (t->l.c == Specials[ESC]) {
-          if (!lexer_advance_char_forward(&t->l)) break;
+        if (*t->l.c == Specials[ESC]) {
+          if (!next_char(&t->l)) break;
           tok.l++;
-          if (!lexer_advance_char_forward(&t->l)) break;
+          if (!next_char(&t->l)) break;
           tok.l++;
         }
       }
@@ -784,14 +804,13 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
       // after it. Similarly, the first character, the row, and the
       // col, should also reflect that.
       tok.f++;
-      if (!lexer_advance_char_forward(&t->l)) return false;
-      tok.c = t->l.c, tok.row = t->l.row + 1, tok.col = t->l.col + 1;
-      if (t->l.c == Specials[ESC]) { // Check for escaped characters.
-        if (!lexer_advance_char_forward(&t->l)) return false;
+      if (!next_char(&t->l)) return false;
+      if (*t->l.c == Specials[ESC]) { // Check for escaped characters.
+        if (!next_char(&t->l)) return false;
         tok.l++; // Increase length to capture the whole thing.
       }
-      if (!lexer_advance_char_forward(&t->l)) return false;
-      if (t->l.c != Specials[SQUOTE]) return false;
+      if (!next_char(&t->l)) return false;
+      if (*t->l.c != Specials[SQUOTE]) return false;
       da_append(t, tok);
       continue;
     } else if (tok.s < SPECIAL_TYPES && !is_frac) {
@@ -799,12 +818,12 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
       if (tok.s == DIV) { // Check for comments
         SpecialType next = special_index(peek_next_char(&t->l));
         if (next == DIV) { // Single-line comment.
-          while (next_char(&t->l)) if (t->l.c == '\n') break;
+          while (next_char(&t->l)) if (*t->l.c == '\n') break;
           continue;
         } else if (next == MULT) { // Multi-line comment.
-          while (lexer_advance_char_forward(&t->l)) {
+          while (next_char(&t->l)) {
             SpecialType prev = special_index(peek_prev_char(&t->l));
-            if (prev == MULT && special_index(t->l.c) == DIV) break;
+            if (prev == MULT && special_index(*t->l.c) == DIV) break;
           }
           continue;
         }
@@ -815,28 +834,28 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
     }
 
     // Numeric or name token.
-    bool is_whole = is_digit(tok.c); // Prepare for numeric token.
+    bool is_whole = is_digit(*tok.f); // Prepare for numeric token.
     double frac = 0;
     double frac_mult = 1;
-    if (is_whole) tok.u64 = tok.u64 * 10 + (tok.c - '0');
+    if (is_whole) tok.u64 = tok.u64 * 10 + (*tok.f - '0');
     while (special_index(peek_next_char(&t->l)) >= SPECIAL_TYPES) {
       // Tokenize the rest of the token.
-      if (!lexer_advance_char_forward(&t->l)) break;
-      if (isspace(t->l.c)) break;
+      if (!next_char(&t->l)) break;
+      if (isspace(*t->l.c)) break;
       tok.l++;
-      is_whole &= is_digit(t->l.c);
-      if (is_whole) tok.u64 = tok.u64 * 10 + (t->l.c - '0');
+      is_whole &= is_digit(*t->l.c);
+      if (is_whole) tok.u64 = tok.u64 * 10 + (*t->l.c - '0');
       if (is_whole && special_index(peek_next_char(&t->l)) == DOT) {
         if (is_frac) return false;
         is_frac = true;
         is_whole = false;
-        if (!lexer_advance_char_forward(&t->l)) break; // Skip the dot.
+        if (!next_char(&t->l)) break; // Skip the dot.
         tok.l++;
-        if (!lexer_advance_char_forward(&t->l)) break; // Digit after the dot.
+        if (!next_char(&t->l)) break; // Digit after the dot.
         tok.l++;
       }
       if (is_frac) {
-        frac = frac * 10 + t->l.c - '0';
+        frac = frac * 10 + *t->l.c - '0';
         frac_mult *= 10;
         is_whole = false;
       }
@@ -861,13 +880,27 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
       }
     }
     da_append(t, tok);
-  } while (lexer_advance_char_forward(&t->l));
+  } while (next_char(&t->l));
 
   return true;
 }
 
+TARE_DEF Loc get_token_loc(const Tokenizer *t, const Token *tok) {
+  Loc loc = {.row = 1, .col = 1};
+  for (const char *point = t->l.buf.items; point < tok->f; point++) {
+    if (*point == '\n') {
+      loc.row++;
+      loc.col = 1;
+      continue;
+    }
+    loc.col++;
+  }
+  return loc;
+}
+
 TARE_DEF void print_loc(FILE *stream, const Tokenizer *t, const Token *tok) {
-  fprintf(stream, "%s:%zu:%zu: ", t->path, tok->row, tok->col);
+  Loc loc = get_token_loc(t, tok);
+  fprintf(stream, "%s:%zu:%zu: ", t->path, loc.row, loc.col);
 }
 
 TARE_DEF void report(ReportLevel r, const Tokenizer *t, const Token *tok, const char *fmt, ...) {
@@ -908,11 +941,19 @@ TARE_DEF void debug_print_token(const Tokenizer *t, const Token *tok) {
   case TOKEN_TYPE_WHOLE_NUM: printf("(whole) %zu\n", tok->u64); break;
   case TOKEN_TYPE_FRAC_NUM: printf("(frac) %lf\n", tok->f64); break;
   case TOKEN_TYPE_KEYWORD: printf("(key) %.*s\n", TOK_ARG(tok)); break;
-  case TOKEN_TYPE_SPECIAL: printf("(special) %c\n", tok->c); break;
+  case TOKEN_TYPE_SPECIAL: printf("(special) %.*s\n", TOK_ARG(tok)); break;
   case TOKEN_TYPE_STRING: printf("(string) %.*s\n", TOK_ARG(tok)); break;
   case TOKEN_TYPE_CHAR: printf("(char) %.*s\n", TOK_ARG(tok)); break;
-  case TOKEN_TYPE_VID:
-    printf("(vid) %.*s (%zu)\n", TOK_ARG(tok), tok->vid); break;
+    
+  case TOKEN_TYPE_GVID:
+    printf("(gvid) %.*s (%zu)\n", TOK_ARG(tok), tok->gvid); break;
+  case TOKEN_TYPE_LVID:
+    printf("(lvid) %.*s (%zu)\n", TOK_ARG(tok), tok->lvid); break;
+  case TOKEN_TYPE_RVID:
+    printf("(rvid) %.*s (%zu)\n", TOK_ARG(tok), tok->rvid); break;
+  case TOKEN_TYPE_AVID:
+    printf("(avid) %.*s (%zu)\n", TOK_ARG(tok), tok->avid); break;
+    
   case TOKEN_TYPE_TID:
     printf("(tid) %.*s (%zu)\n", TOK_ARG(tok), tok->tid); break;
   case TOKEN_TYPE_FID:
@@ -1126,9 +1167,9 @@ TARE_DEF bool expect_char(Tokenizer *t) {
   return expect_token_type(t, TOKEN_TYPE_CHAR);
 }
 
-TARE_DEF bool expect_vid(Tokenizer *t) {
-  return expect_token_type(t, TOKEN_TYPE_VID);
-}
+/* TARE_DEF bool expect_vid(Tokenizer *t) { */
+/*   return expect_token_type(t, TOKEN_TYPE_VID); */
+/* } */
 
 TARE_DEF bool expect_tid(Tokenizer *t) {
   return expect_token_type(t, TOKEN_TYPE_TID);
