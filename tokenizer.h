@@ -339,25 +339,21 @@ typedef struct {
   size_t l;        // The length of the token.
 
   union {
-    union {
-      size_t u64;  // The token's value as a whole number.
-      double f64;  // The token's value as a floating point number.
-    };
+    size_t u64;    // The token's value as a whole number.
+    double f64;    // The token's value as a floating point number.
 
-    union {
-      size_t jmp;  // The token to which this one is connected - for
+    size_t jmp;    // The token to which this one is connected - for
                    // example, a `(` token is connected to a `)`
                    // token.
-      size_t gvid; // Token's index as a global variable identifier.
-      size_t lvid; // Token's index as a local variable identifier.
-      size_t rvid; // Token's index as a return value identifier.
-      size_t avid; // Token's index as a function arg identifier.
-      size_t tid;  // The token's index as a type identifier. This
+    size_t gvid;   // Token's index as a global variable identifier.
+    size_t lvid;   // Token's index as a local variable identifier.
+    size_t rvid;   // Token's index as a return value identifier.
+    size_t avid;   // Token's index as a function arg identifier.
+    size_t tid;    // The token's index as a type identifier. This
                    // would be more useful once a type system is
                    // established, even though for now, it's mostly
                    // unnecessary.
-      size_t fid;  // The token's index as a function identifier.
-    };
+    size_t fid;    // The token's index as a function identifier.
   };
 } Token;
 
