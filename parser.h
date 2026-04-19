@@ -1417,18 +1417,15 @@ TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns) {
 
   if (!to_token(t, point)) return false;
   if (!valid_func) {
-    print_loc(stderr, t, t->t);
-    fprintf(stderr, "error: invalid function signature!\n");
-    print_loc(stdout, t, t->t);
-    fprintf(stdout, "note: a proper function signature would like one of the following four options: \n");
-    fprintf(stdout, "%*.sfunc NAME (ARGS) => (RETS): {BODY}\n", 4, "");
-    fprintf(stdout, "%*.sfunc NAME (ARGS): {BODY}\n", 4, "");
-    fprintf(stdout, "%*.sfunc NAME => (RETS): {BODY}\n", 4, "");
-    fprintf(stdout, "%*.sfunc NAME: {BODY}\n", 4, "");
-    print_loc(stdout, t, t->t);
-    fprintf(stdout, "note: while the space between `func` and `NAME` is necessary, the other whitespaces shown in this signature are unnecessary and ignored by the lexer and tokenizer.\n");
-    print_loc(stdout, t, t->t);
-    fprintf(stdout, "note: furthermore, `BODY` must include in it a `%.*s` statement.\n", SV_ARG(Keywords[KEY_RET]));
+    diag_err(t, first, "invalid function signature!\n");
+    diag_notef(t, first, "a proper function signature would be one of the following four options: \n"
+               "%*.sfunc NAME (ARGS) => (RETS): {BODY}\n"
+               "%*.sfunc NAME (ARGS): {BODY}\n"
+               "%*.sfunc NAME => (RETS): {BODY}\n"
+               "%*.sfunc NAME: {BODY}\n",
+               4, "", 4, "", 4, "", 4, "");
+    diag_note(t, first, "while the space between `func` and `NAME` is necessary, the other whitespaces shown in this signature are unnecessary and ignored by the lexer and tokenizer.\n");
+    diag_notef(t, first, "furthermore, `BODY` must include in it a `%.*s` statement.\n", SV_ARG(Keywords[KEY_RET]));
     return false;
   }
   
