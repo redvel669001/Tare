@@ -1,4 +1,3 @@
-
 #define CMD_IMPLEMENTATION
 #include "cmd.h"
 
@@ -102,7 +101,7 @@ int main(int argc, char **argv) {
   cmd_append(&cmd, "chmod", "+x", paths.output_bin);
   if (!run_cmd(&cmd, redirect, true)) return 1;
 
-  if (t.l.buf.items) free(t.l.buf.items);
+  if (t.l.items) free(t.l.items);
   if (t.items) free(t.items);
   if (cmd.items) free(cmd.items);
   if (flags.items) free(flags.items);
