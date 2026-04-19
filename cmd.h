@@ -13,8 +13,8 @@
 
 #include "da.h"
 
-#define cmd_append(cmd, ...)                    \
-  da_append_many(cmd,                                  \
+#define cmd_append(cmd, ...)                                            \
+  da_append_many(cmd,                                                   \
                  ((const char*[]){__VA_ARGS__}),                        \
                  (sizeof((const char*[]){__VA_ARGS__})/sizeof(const char*)))
 
@@ -32,7 +32,7 @@ typedef struct {
 
 TARE_DEF void display_cmd(const Cmd *cmd);
 TARE_DEF bool run_cmd(Cmd *cmd, Redirect redirect, bool display);
-TARE_DEF bool run_cmd_(Cmd *cmd, Redirect redirect, bool display);
+TARE_DEF bool run_cmd_function(Cmd *cmd, Redirect redirect, bool display);
 
 #endif // CMD_H_
 
@@ -52,12 +52,12 @@ TARE_DEF bool run_cmd(Cmd *cmd, Redirect redirect, bool display) {
   assert(cmd != NULL);
   assert(cmd->items != NULL);
   da_append(cmd, NULL);
-  bool success = run_cmd_(cmd, redirect, display);
+  bool success = run_cmd_function(cmd, redirect, display);
   cmd->count = 0;
   return success;
 }
 
-TARE_DEF bool run_cmd_(Cmd *cmd, Redirect redirect, bool display) {
+TARE_DEF bool run_cmd_function(Cmd *cmd, Redirect redirect, bool display) {
   if (display) display_cmd(cmd);
   pid_t cpid = fork();
   if (cpid < 0) {
