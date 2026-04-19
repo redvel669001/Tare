@@ -181,7 +181,6 @@ TARE_DEF void patch_tokenizer_builtin_types(Tokenizer *t);
 TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Funcs *fns);
 TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Funcs *fns);
 TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args);
-TARE_DEF bool patch_tokenizer_rets(Tokenizer *t, Funcs *fns);
 TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t);
 
 TARE_DEF const char *op_type_as_string(OpType type); // For debugging.
@@ -1509,22 +1508,6 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Func *fn, bool args) {
       Token next = peek_next_token(t);
       if (next.t != TOKEN_TYPE_SPECIAL) continue;
       if (next.s == PAR_END) if (!next_token(t)) return false;
-    }
-  }
-
-  return true;
-}
-
-TARE_DEF bool patch_tokenizer_rets(Tokenizer *t, Funcs *fns) {
-  if (t == NULL || fns == NULL) return false;
-  
-  for (size_t i = 0; i < fns->count; i++) {
-    Func *fn = fns->items + i;
-    for (size_t j = fn->start; j < fn->end; j++) {
-      Token *tok = t->items + j;
-      if (tok->t != TOKEN_TYPE_KEYWORD) continue;
-      if (tok->k != KEY_RET) continue;
-      tok->fid = i;
     }
   }
 
