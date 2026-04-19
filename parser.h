@@ -1524,9 +1524,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
     else if (tok->s == BLK_BGN) da_append(&blk, i);
     else if (tok->s == PAR_END) {
       if (par.count == 0) {
-        fprintf(stderr, "%s:%zu:%zu: error: "
-                "can't close parentheses that haven't been opened.\n",
-                t->path, tok->row, tok->col);
+        diag_err(t, tok, "can't close parentheses that haven't been opened.\n");
       }
       size_t jmp = par.items[--par.count];
       tok->jmp = jmp;
@@ -1534,9 +1532,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
       tok->jmp = i;
     } else if (tok->s == GRP_END) {
       if (grp.count == 0) {
-        fprintf(stderr, "%s:%zu:%zu: error: "
-                "can't end a group that hasn't been started.\n",
-                t->path, tok->row, tok->col);
+        diag_err(t, tok, "can't end a group that hasn't been started.\n");
       }
       size_t jmp = grp.items[--grp.count];
       tok->jmp = jmp;
@@ -1544,9 +1540,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
       tok->jmp = i;
     } else if (tok->s == BLK_END) {
       if (blk.count == 0) {
-        fprintf(stderr, "%s:%zu:%zu: error: "
-                "can't close a block that hasn't been started.\n",
-                t->path, tok->row, tok->col);
+        diag_err(t, tok, "can't close a block that hasn't been started.\n");
       }
       size_t jmp = blk.items[--blk.count];
       tok->jmp = jmp;
@@ -1559,9 +1553,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
     for (size_t i = 0; i < par.count; i++) {
       size_t jmp = par.items[i];
       Token *tok = t->items + jmp;
-      fprintf(stderr, "%s:%zu:%zu: error: "
-              "parentheses opened but didn't close.\n",
-              t->path, tok->row, tok->col);
+      diag_err(t, tok, "parentheses opened but didn't close.\n");
     }
   }
 
@@ -1569,9 +1561,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
     for (size_t i = 0; i < grp.count; i++) {
       size_t jmp = grp.items[i];
       Token *tok = t->items + jmp;
-      fprintf(stderr, "%s:%zu:%zu: error: "
-              "group started but didn't end.\n",
-              t->path, tok->row, tok->col);
+      diag_err(t, tok, "group started but didn't end.\n");
     }
   }
 
@@ -1579,9 +1569,7 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
     for (size_t i = 0; i < blk.count; i++) {
       size_t jmp = blk.items[i];
       Token *tok = t->items + jmp;
-      fprintf(stderr, "%s:%zu:%zu: error: "
-              "block started but didn't close.\n",
-              t->path, tok->row, tok->col);
+      diag_err(t, tok, "block started but didn't close.\n");
     }
   }
 
