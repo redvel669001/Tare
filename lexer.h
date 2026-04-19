@@ -6,7 +6,7 @@
 typedef struct {
   String buf;
   size_t index;
-  const char *c;
+  char *c;
 } Lexer;
 
 TARE_DEF bool is_digit(char c);
