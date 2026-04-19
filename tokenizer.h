@@ -17,12 +17,12 @@
 // to 0, with values incrementing, meaning `SPECIAL_TYPES` acts as a
 // counter.
 //
-// Then a `Specials` character array (string) is made from that enum,
-// with its characters indexed in positions matching the enum, and the
-// array length being `SPECIAL_TYPES`. While using the enum's counter
-// as the array length can prevent SOME errors at copmile time, it
-// doesn't necessarily always catch them all, hence the static assert
-// right above it.
+// Then a `Specials` character array is made from that enum, with its
+// characters indexed in positions matching the enum, and the array
+// length being `SPECIAL_TYPES`. While using the enum's counter as the
+// array length can prevent SOME errors at copmile time, it doesn't
+// necessarily always catch them all, hence the static assert right
+// above it.
 //
 // Additionally, a static assert can be found right above the
 // implementation of the `special_index` function, as that's another
@@ -56,8 +56,32 @@ typedef enum {
   SPECIAL_TYPES,
 } SpecialType;
 
-static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `Specials` character array (string).");
-const char Specials[SPECIAL_TYPES] = "()[]{}\"\'\\,;.:/*+-<>=!&|";
+static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `Specials` character array.");
+const char Specials[SPECIAL_TYPES] = {
+  [PAR_BGN] = '(',
+  [PAR_END] = ')',
+  [GRP_BGN] = '[',
+  [GRP_END] = ']',
+  [BLK_BGN] = '{',
+  [BLK_END] = '}',
+  [DQUOTE]  = '\"',
+  [SQUOTE]  = '\'',
+  [ESC]     = '\\',
+  [SEP]     = ',',
+  [END]     = ';',
+  [DOT]     = '.',
+  [DEF]     = ':',
+  [DIV]     = '/',
+  [MULT]    = '*',
+  [ADD]     = '+',
+  [SUB]     = '-',
+  [LESS]    = '<',
+  [GREATER] = '>',
+  [EQUAL]   = '=',
+  [NOT]     = '!',
+  [AND]     = '&',
+  [OR]      = '|',
+};
 
 // -------------------------------------------------------------------
 
@@ -369,9 +393,9 @@ typedef enum {
 // unimportant beyond that stage.
 
 // For a character c, if it is equal to some special character, return
-// that special character's index in the `Specials` character array
-// (string). If it isn't present, simply return SPECIAL_TYPES to
-// indicate failure.
+// that special character's index in the `Specials` character
+// array. If it isn't present, simply return SPECIAL_TYPES to indicate
+// failure.
 TARE_DEF SpecialType special_index(char c);
 
 // Read file `path` and lexically analyze it to fill tokenizer
@@ -390,7 +414,7 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t);
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
-// ---------------------- DIAGNOSTICS FUNCTIONS: ---------------------
+// -------------------------- DIAGNOSTICS: ---------------------------
 // -------------------------------------------------------------------
 //
 // These functions and macros should be used for reporting errors,
