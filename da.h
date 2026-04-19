@@ -1,6 +1,5 @@
 #ifndef DA_H_
 #define DA_H_
-#endif // DA_H_
 
 // Lots of things in this header file were copied from nob.h, though
 // most of these things were additionally simplified.
@@ -53,3 +52,4 @@
     (da)->count += (new_items_count);                                   \
   } while (0)
 
+#endif // DA_H_
