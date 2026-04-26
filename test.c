@@ -83,12 +83,12 @@ int main(void) {
 
   /* printf("Testing %d tare files...\n\n", EXAMPLES_COUNT); */
   
+  Cmd cmd = {0};
+  Redirect redirect = {0};
   for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
     if (i == EXAMPLE_FUNC || i == EXAMPLE_READ) continue;
     Paths paths = examples_paths[i];
     
-    Cmd cmd = {0};
-    Redirect redirect = {0};
     if (build_examples) {
       printf("--------------------------------------------------\n");
       cmd_append(&cmd, "./tare", paths.path);
@@ -101,6 +101,13 @@ int main(void) {
       putchar(10);
       printf("--------------------------------------------------\n\n");
     }
+  }
+  
+  if (cmd.items) free(cmd.items);
+
+  for(size_t i = 0; i < EXAMPLES_COUNT; i++) {
+    Paths paths = examples_paths[i];
+    if (paths.arena.items) free(paths.arena.items);
   }
   
   return 0;
