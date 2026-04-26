@@ -768,12 +768,12 @@ TARE_DEF void gen_comparison_op(Generator *g, FILE *f) {
 
   const char *inst = "";
   
-  if (g->op->op == OP_LESS) inst = "cmovl";
-  else if (g->op->op == OP_LESS_EQUAL) inst = "cmovle";
-  else if (g->op->op == OP_GREATER) inst = "cmovg";
-  else if (g->op->op == OP_GREATER_EQUAL) inst = "cmovge";
-  else if (g->op->op == OP_EQUAL) inst = "cmove";
-  else if (g->op->op == OP_NOT_EQUAL) inst = "cmovne";
+  if (g->op->type == OP_LESS) inst = "cmovl";
+  else if (g->op->type == OP_LESS_EQUAL) inst = "cmovle";
+  else if (g->op->type == OP_GREATER) inst = "cmovg";
+  else if (g->op->type == OP_GREATER_EQUAL) inst = "cmovge";
+  else if (g->op->type == OP_EQUAL) inst = "cmove";
+  else if (g->op->type == OP_NOT_EQUAL) inst = "cmovne";
   else assert(false && "unreachable");
 
   fprintf(f, "%s QWORD rcx, QWORD [true]\n", inst);
