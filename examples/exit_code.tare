@@ -1,0 +1,15 @@
+func main => (u64 exit_code,): {
+  a(10);
+  n();
+  a(74);
+  n();
+  a(32);
+  n();
+  a(74);
+  n();
+  a(10);
+  n();
+  write(base, index);
+  exit_code = 4;
+  ret;
+}

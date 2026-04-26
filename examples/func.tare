@@ -15,7 +15,7 @@ func main: {
   i();
   while(tape): {
   r16
-  n(); test n(); test n(); test b(3); r64 i(); test
+  n(); test(); n(); test(); n(); test(); b(3); r64 i(); test();
   }
   // end
 

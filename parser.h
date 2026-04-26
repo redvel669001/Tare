@@ -22,6 +22,7 @@ typedef struct {
   size_t vid;
   size_t tid;
   StringView name;
+  size_t initial; // initial value
 } Var;
 
 typedef struct {
@@ -29,23 +30,6 @@ typedef struct {
   size_t count;
   size_t capacity;
 } Vars;
-
-/* typedef struct { */
-/*   StringView name; */
-/*   Token *first; */
-  
-/*   Vars args; */
-/*   Vars rets; */
-  
-/*   size_t start; */
-/*   size_t end; */
-/* } Func; */
-
-/* typedef struct { */
-/*   Func *items; */
-/*   size_t count; */
-/*   size_t capacity; */
-/* } Funcs; */
 
 typedef enum {
   OP_PTR_ADD = 0,
@@ -92,10 +76,16 @@ typedef enum {
   
   OP_DEREF,
 
-  OP_ARG,
   OP_NUM,
 
   OP_POP_FROM_OPS,
+
+  OP_GVID,
+  OP_LVID,
+  OP_RVID,
+  OP_AVID,
+  
+  OP_ASSIGN,
 
   OP_TYPES,
 } OpType;
@@ -113,12 +103,6 @@ typedef enum {
   PREC_ADD_SUB,
   PREC_MUL_DIV_REM,
   PREC_PAR_BGN,
-  
-  /* PREC_LESS_GREATER, */
-  /* PREC_ADD_SUB, */
-  /* PREC_MUL_DIV, */
-  /* PREC_SHL_SHR, */
-  /* PREC_PAR_BGN, */
   OP_PRECS,
 } OpPrec;
 
@@ -136,6 +120,8 @@ typedef struct {
 
   Vars args;
   Vars rets;
+
+  Vars lvars; // properly implement later
 
   size_t start;
   size_t end;
@@ -199,7 +185,16 @@ TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns);
 TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args);
 TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t);
 
+TARE_DEF size_t get_vars_size(Vars *vars);
+TARE_DEF size_t get_vars_size_with_padding(Vars *vars);
+TARE_DEF size_t get_args_size(Function *fn);
+TARE_DEF size_t get_rets_size(Function *fn);
+TARE_DEF size_t get_lvars_size(Function *fn);
+
 TARE_DEF const char *op_type_as_string(OpType type); // For debugging.
+TARE_DEF void print_var(const Var *var, size_t i);
+TARE_DEF void print_vars(const Vars *vars);
+TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i);
 TARE_DEF void print_function(const Tokenizer *t, const Function *func);
 TARE_DEF void print_functions(const Parser *p);
 
@@ -210,6 +205,14 @@ TARE_DEF void print_functions(const Parser *p);
 #define TEST_EXPR(expr) printf(#expr " = %zu\n", (size_t) (expr));
 
 TARE_DEF bool parse_file(Parser *p) {
+  {
+    Tokenizer *t = p->t;
+    bool debug = false;
+    for (Token *tok = t->items; (tok < t->items + t->count) && debug; tok++)
+      debug_print_token(t, tok);
+    if (debug) return true;
+  }
+  
   if (p == NULL) return false;
   
   Tokenizer *t = p->t;
@@ -218,18 +221,11 @@ TARE_DEF bool parse_file(Parser *p) {
   patch_tokenizer_builtin_types(t);
   if (!patch_tokenizer_bgn_end(t)) return false;
   
-  /* Funcs fns = {0}; */
-  /* Func main = {.name = SV_MAKE(main)}; */
-  /* da_append(&fns, main); */
-
   Function main = {.name = SV_MAKE(main)};
   da_append(p->funcs, main);
   if (!patch_tokenizer_funcs(t, p->funcs)) return false;
 
-  /* for (size_t i = 0; i < fns.count; i++) da_append(p->funcs, (Function) {0}); */
-
   p->func = p->funcs->items;
-  /* p->fns = &fns; */
 
   while (true) {
     if (!parse_statement(p)) return false;
@@ -238,27 +234,6 @@ TARE_DEF bool parse_file(Parser *p) {
 
   bool debug = false;
   if (debug) print_functions(p);
-
-  // For reference for later, when these things get freed in the
-  // proper place. The parser is still in its early stages, so this
-  // can wait.
-  
-  /* // Free fns */
-  /* for (size_t i = 0 ; i < fns.count; i++) { */
-  /*   Func fn = fns.items[i]; */
-  /*   if (fn.args.items) free(fn.args.items); */
-  /*   if (fn.rets.items) free(fn.rets.items); */
-  /* } */
-
-  /* if (fns.items) free(fns.items); */
-  
-  /* // Free funcs */
-  /* for (size_t i = 0 ; i < funcs->count; i++) { */
-  /*   Function fn = funcs->items[i]; */
-  /*   if (fn.items) free(fn.items); */
-  /* } */
-
-  /* if (funcs->items) free(fns.items); */
 
   p->stack.count = 0;
   if (p->stack.items) free(p->stack.items);
@@ -270,7 +245,7 @@ TARE_DEF StringView sv_from_token(const Token *t) {
   return (StringView) {.s = t->f, .l = t->l};
 }
 
-static_assert(OP_TYPES == 41, "update parse_statement");
+static_assert(OP_TYPES == 45, "update parse_statement");
 TARE_DEF bool parse_statement(Parser *p) {
   if (p == NULL) return false;
   
@@ -409,7 +384,6 @@ TARE_DEF bool parse_statement(Parser *p) {
           if (!parse_statement(p)) return false;
         }
       }
-      /* if (!expect_special(t, END)) return false; */
       break;
     case KEY_RET:
       if (!expect_special(t, END)) return false;
@@ -508,7 +482,24 @@ TARE_DEF bool parse_statement(Parser *p) {
     
   case TOKEN_TYPE_GVID: unimpl("TOKEN_TYPE_GVID"); break;
   case TOKEN_TYPE_LVID: unimpl("TOKEN_TYPE_LVID"); break;
-  case TOKEN_TYPE_RVID: unimpl("TOKEN_TYPE_RVID"); break;
+  case TOKEN_TYPE_RVID:
+    op.type = OP_RVID;
+    op.op = t->t->rvid;
+    da_append(p->func, op);
+    
+    op.type = OP_ASSIGN;
+    if (!expect_special_many(t, SEP, EQUAL)) return false;
+    if (t->t->s == SEP) {
+      unimpl("SEP in TOKEN_TYPE_RVID");
+      return false;
+    }
+    if (t->t->s == EQUAL) {
+      if (!next_token(t)) return false;
+      if (!parse_expression(p)) return false;
+      da_append(p->func, op);
+    }
+    break;
+    unimpl("TOKEN_TYPE_RVID"); break;
   case TOKEN_TYPE_AVID: unimpl("TOKEN_TYPE_AVID"); break;
     
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
@@ -523,7 +514,7 @@ TARE_DEF bool parse_statement(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 41, "update parse_expression");
+static_assert(OP_TYPES == 45, "update parse_expression");
 TARE_DEF bool parse_expression(Parser *p) {
   if (p == NULL) return false;
   
@@ -783,10 +774,34 @@ TARE_DEF bool parse_expression(Parser *p) {
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
     
-  case TOKEN_TYPE_GVID: unimpl("TOKEN_TYPE_GVID"); break;
-  case TOKEN_TYPE_LVID: unimpl("TOKEN_TYPE_LVID"); break;
-  case TOKEN_TYPE_RVID: unimpl("TOKEN_TYPE_RVID"); break;
-  case TOKEN_TYPE_AVID: unimpl("TOKEN_TYPE_AVID"); break;
+  case TOKEN_TYPE_GVID:
+    op.type = OP_GVID;
+    op.op = t->t->gvid;
+    append_op(p, op);
+    op.type = OP_DEREF;
+    append_op(p, op);
+    break;
+  case TOKEN_TYPE_LVID:
+    op.type = OP_LVID;
+    op.op = t->t->lvid;
+    append_op(p, op);
+    op.type = OP_DEREF;
+    append_op(p, op);
+    break;
+  case TOKEN_TYPE_RVID:
+    op.type = OP_RVID;
+    op.op = t->t->rvid;
+    append_op(p, op);
+    op.type = OP_DEREF;
+    append_op(p, op);
+    break;
+  case TOKEN_TYPE_AVID:
+    op.type = OP_AVID;
+    op.op = t->t->avid;
+    append_op(p, op);
+    op.type = OP_DEREF;
+    append_op(p, op);
+    break;
     
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
@@ -799,6 +814,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       while (t->index != end) {
         if (!parse_expression(p)) return false;
         if (!expect_special_many(t, SEP, PAR_END)) return false;
+        if (t->index == end) break;
         if (!next_token(t)) return false;
       }
     }
@@ -816,7 +832,7 @@ TARE_DEF bool parse_expression(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 41, "update parse_expression_arithmetics");
+static_assert(OP_TYPES == 45, "update parse_expression_arithmetics");
 TARE_DEF bool parse_expression_arithmetics(Parser *p) {
   if (p == NULL) return false;
   
@@ -992,7 +1008,7 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
   case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
   case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
-  case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
+  case OP_CONST: case OP_PUSH: case OP_POP: case OP_NUM:
   case OP_POP_FROM_OPS: case OP_TYPES: default: return false;
 
   case OP_ADD: case OP_SUB:
@@ -1057,6 +1073,21 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
       return false;
     }
     break;
+    
+  case OP_ASSIGN:
+    {
+      Tokenizer *t = p->t;
+      t->t = op->start;
+      unimpl("OP_ASSIGN optimization");
+      return false;
+    }
+  case OP_GVID: case OP_LVID: case OP_RVID: case OP_AVID:
+    {
+      Tokenizer *t = p->t;
+      t->t = op->start;
+      unimpl("OP_*VID optimization");
+      return false;
+    }
   }
 
   return true;
@@ -1088,7 +1119,7 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
   case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
-  case OP_CONST: case OP_PUSH: case OP_POP: case OP_ARG: case OP_NUM:
+  case OP_CONST: case OP_PUSH: case OP_POP: case OP_NUM:
   case OP_POP_FROM_OPS: case OP_TYPES:
     return OP_PRECS;
     
@@ -1114,6 +1145,9 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   case OP_DEREF: return OP_PRECS;
 
   case OP_NOT: return OP_PRECS;
+    
+  case OP_ASSIGN:
+  case OP_GVID: case OP_LVID: case OP_RVID: case OP_AVID:
   default: return OP_PRECS;
   }
 }
@@ -1322,12 +1356,13 @@ TARE_DEF bool pop_stack(Parser *p) {
   
   case OP_DEREF: return true; // not sure how to handle this yet
 
-  case OP_ARG: return true; // not sure how to handle this yet
   case OP_NUM:
     break;
     return true;
   case OP_POP_FROM_OPS: return true; // ????
+  case OP_ASSIGN: return false; // ???
   case OP_TYPES: return false; // this should be an error
+  case OP_GVID: case OP_LVID: case OP_RVID: case OP_AVID: return true;
   }
   if (debug) printf("stack after pop: %zu\n", p->stack.count);
   if (debug) printf("--------------------------------------------------\n\n");
@@ -1361,11 +1396,14 @@ TARE_DEF bool op_has_side_effect(Operation *op) {
   
   case OP_DEREF: return true; // ????
 
-  case OP_ARG: return true; // ???
   case OP_NUM: return false;
 
   case OP_POP_FROM_OPS: return true;
 
+  case OP_ASSIGN: return true;
+
+  case OP_GVID: case OP_LVID: case OP_RVID: case OP_AVID: return false;
+    
   case OP_TYPES: return false; // should be an error.
   default: assert(false && "unreachable");
   }
@@ -1537,36 +1575,25 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
       if (tok->k == KEY_RET) break;
       if (tok->t != TOKEN_TYPE_NAME) continue;
       if (tok_eq(t->t, tok)) {
-        /* tok->t = TOKEN_TYPE_VID; */
-        /* tok->vid = arg.vid; */
         switch (scope) {
         case SCOPE_GLOBAL:
           assert(false && "SCOPE_GLOBAL should be impossible");
-          /* unimpl("SCOPE_GLOBAL"); */
           break;
         case SCOPE_LOCAL:
           assert(false && "SCOPE_LOCAL should be impossible");
-          /* unimpl("SCOPE_LOCAL"); */
           break;
         case SCOPE_ARGUMENT:
           tok->t = TOKEN_TYPE_AVID;
           tok->avid = arg.vid;
-          /* assert(false && "SCOPE_ARGUMENT should be impossible"); */
-          /* unimpl("SCOPE_ARGUMENT"); */
           break;
         case SCOPE_RETURN:
           tok->t = TOKEN_TYPE_RVID;
           tok->rvid = arg.vid;
-          /* assert(false && "SCOPE_RETURN should be impossible"); */
-          /* unimpl("SCOPE_RETURN"); */
           break;
         case SCOPE_TYPES:
           assert(false && "SCOPE_TYPES should be impossible");
-          /* unimpl("SCOPE_TYPES"); */
           break;
         }
-        /* diag_warn(t, tok, "stuff\n"); */
-        /* assert(false && "oops"); */
       }
     }
 
@@ -1653,6 +1680,51 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
   return (par.count == 0) && (grp.count == 0) && (blk.count == 0);
 }
 
+TARE_DEF size_t get_vars_size(Vars *vars) {
+  size_t result = 0;
+  for (size_t i = 0; i < vars->count; i++) {
+    Var arg = vars->items[i];
+    switch (arg.tid) {
+    case TYPE_U8: result++; break;
+    case TYPE_U16: result += 2; break;
+    case TYPE_U32: result += 4; break;
+    case TYPE_U64: result += 8; break;
+    case TYPES_COUNT: 
+    default: assert(false && "unimplemented");
+    }
+  }
+  return result;
+}
+
+TARE_DEF size_t get_vars_size_with_padding(Vars *vars) {
+  size_t result = 0;
+  for (size_t i = 0; i < vars->count; i++) {
+    Var var = vars->items[i];
+    switch (var.tid) {
+    case TYPE_U8: result++; break;
+    case TYPE_U16: result += 2; break;
+    case TYPE_U32: result += 4; break;
+    case TYPE_U64: result += 8; break;
+    case TYPES_COUNT: 
+    default: assert(false && "unimplemented");
+    }
+    if (result % 8 != 0) result += (8 - result % 8);
+  }
+  return result;
+}
+
+TARE_DEF size_t get_args_size(Function *fn) {
+  return get_vars_size(&fn->args);
+}
+
+TARE_DEF size_t get_rets_size(Function *fn) {
+  return get_vars_size(&fn->rets);
+}
+
+TARE_DEF size_t get_lvars_size(Function *fn) {
+  return get_vars_size(&fn->lvars);
+}
+
 TARE_DEF const char *op_type_as_string(OpType type) {
   switch (type) {
   case OP_PTR_ADD: return "OP_PTR_ADD";
@@ -1698,42 +1770,80 @@ TARE_DEF const char *op_type_as_string(OpType type) {
     
   case OP_DEREF: return "OP_DEREF";
 
-  case OP_ARG: return "OP_ARG";
   case OP_NUM: return "OP_NUM";
   
   case OP_POP_FROM_OPS: return "OP_POP_FROM_OPS";
+    
+  case OP_ASSIGN: return "OP_ASSIGN";
+    
+  case OP_GVID: return "OP_GVID";
+  case OP_LVID: return "OP_LVID";
+  case OP_RVID: return "OP_RVID";
+  case OP_AVID: return "OP_AVID";
     
   case OP_TYPES: return "OP_TYPES";
   default: return "";
   }
 }
 
-TARE_DEF void print_function(const Tokenizer *t, const Function *func) {
-  for (size_t i = 0; i < func->count; i++) {
-    Operation op = func->items[i];
-    printf("--------------------------------------------------\n");
-    debug_print_token(t, op.start);
-    printf("op (%zu) = {\n", i);
-    printf("  .start = ");
-    debug_print_token(t, op.start);
-    printf("  .type = %s\n", op_type_as_string(op.type));
-    printf("  .args = %p\n", (void*)op.args);
-    printf("  .args_count = %zu\n", op.args_count);
-    printf("  .op = %zu\n", op.op);
-    if (op.name.s != NULL) printf("  .name = %.*s\n", SV_ARG(op.name));
-    else printf("  .name = {.s = %p, .l = %zu}\n", op.name.s, op.name.l);
-    printf("}\n");
-    printf("--------------------------------------------------\n\n");
+static_assert(sizeof(Var) == 48, "Struct `Var` has been updated. Make sure debugging works out properly.");
+TARE_DEF void print_var(const Var *var, size_t i) {
+  printf("--------------------------------------------------\n");
+  printf("Var (%zu) = {\n", i);
+  printf("  scope = %u\n", var->scope);
+  printf("  vid = %zu\n", var->vid);
+  printf("  tid = %zu\n", var->tid);
+  printf("  name = %.*s\n", SV_ARG(var->name));
+  printf("}\n");
+  printf("--------------------------------------------------\n");
+}
+
+TARE_DEF void print_vars(const Vars *vars) {
+  for (size_t i = 0; i < vars->count; i++) {
+    Var *var = vars->items + i;
+    print_var(var, i);
   }
 }
 
+static_assert(sizeof(Operation) == 56, "Struct `Operation` has been updated. Make sure debugging works out properly.");
+TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
+  printf("--------------------------------------------------\n");
+  debug_print_token(t, op->start);
+  printf("op (%zu) = {\n", i);
+  printf("  .start = ");
+  debug_print_token(t, op->start);
+  printf("  .type = %s\n", op_type_as_string(op->type));
+  printf("  .args = %p\n", (void*)op->args);
+  printf("  .args_count = %zu\n", op->args_count);
+  printf("  .op = %zu\n", op->op);
+  if (op->name.s != NULL) printf("  .name = %.*s\n", SV_ARG(op->name));
+  else printf("  .name = {.s = %p, .l = %zu}\n", op->name.s, op->name.l);
+  printf("}\n");
+  printf("--------------------------------------------------\n\n");
+}
+
+static_assert(sizeof(Function) == 128, "Struct `Function` has been updated. Make sure debugging works out properly.");
+TARE_DEF void print_function(const Tokenizer *t, const Function *func) {
+  printf("\n--------------------------------------------------\n");
+  printf("Function `%.*s`\n", SV_ARG(func->name));
+  for (size_t i = 0; i < func->count; i++) {
+    const Operation *op = func->items + i;
+    print_op(t, op, i);
+  }
+  printf("------------------- FUNCTION ARGUMENTS -------------------\n");
+  print_vars(&func->args);
+  printf("------------------- RETURN VALUES -------------------\n");
+  print_vars(&func->rets);
+  printf("------------------- LOCAL VARIABLES -------------------\n");
+  print_vars(&func->lvars);
+  printf("\n--------------------------------------------------\n");
+}
+
+static_assert(sizeof(Parser) == 56, "Struct `Parser` has been updated. Make sure debugging works out properly.");
 TARE_DEF void print_functions(const Parser *p) {
   for (size_t i = 0; i < p->funcs->count; i++) {
     Function *func = p->funcs->items + i;
-    printf("\n--------------------------------------------------\n");
-    printf("Function `%.*s`\n", SV_ARG(func->name));
     print_function(p->t, func);
-    printf("\n--------------------------------------------------\n");
   }
 }
 

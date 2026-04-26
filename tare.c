@@ -24,8 +24,8 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 #define PARSER_IMPLEMENTATION
 #include "parser.h"
 
-#define GENERATOR_IMPLEMENTATION
-#include "generator.h"
+#define CODEGEN_IMPLEMENTATION
+#include "codegen.h"
 
 #define FLAGS_IMPLEMENTATION
 #include "flags.h"
@@ -108,6 +108,17 @@ int main(int argc, char **argv) {
   if (paths.arena.items) free(paths.arena.items);
   if (prog.items) free(prog.items);
   
+  for (size_t i = 0 ; i < funcs.count; i++) {
+    Function fn = funcs.items[i];
+    if (fn.items) free(fn.items);
+    if (fn.args.items) free(fn.args.items);
+    if (fn.rets.items) free(fn.rets.items);
+  }
+
+  if (funcs.items) free(funcs.items);
+
+  if (gotos.items) free(gotos.items);
+  
   return 0;
 }
 
@@ -134,7 +145,7 @@ TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build) {
   if (!append_to_string(&ps->arena, path, final_dot)) return false;
   if (!append_to_string(&ps->arena, ".s", 2)) return false;
   da_append(&ps->arena, 0);
-  
+
   ps->output_bin = ps->arena.items + ps->arena.count;
   if (!append_to_string(&ps->arena, "./", 2)) return false;
   if (!append_to_string(&ps->arena, build.s, build.l)) return false;

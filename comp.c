@@ -8,14 +8,10 @@
 #include <sys/stat.h>
 
 #define CFLAGS_BASIC "-Wextra", "-Wall", "-pedantic"
-#define CFLAGS_BASIC_FAST "-Wextra", "-Wall", "-Ofast", "-pedantic"
 
 #define CFLAGS_STRICT "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow"
-#define CFLAGS_STRICT_FAST "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Ofast"
 
 #define CFLAGS_EXTRA_STRICT "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum"
-
-#define CFLAGS_EXTRA_STRICT_FAST "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum", "-Ofast"
 
 TARE_DEF void verify_flags(void);
 
@@ -26,18 +22,10 @@ TARE_DEF double timespec_to_double(struct timespec tm);
 TARE_DEF double get_stat_time(const struct stat *statbuf);
 
 int main(int argc, char **argv) {
-  {
-    Cmd cmd = {0};
-    cmd_append(&cmd, "echo", "fix the vids already!!!\n");
-    if (!run_cmd(&cmd, (Redirect){0}, true)) return false;
-  }
-  
   bool basic = true;
-  bool basic_fast = false;
   bool strict = false;
-  bool strict_fast = false;
   bool extra_strict = false;
-  bool extra_strict_fast = false;
+  bool fast = false;
   bool werror = false;
   bool no_werror = false;
   bool rebuild = false;
@@ -48,14 +36,14 @@ int main(int argc, char **argv) {
   bool no_debug = false;
   bool profile = false;
   bool no_profile = false;
+  bool test = false;
+  bool no_test = false;
 
   enum {
     FLAG_BASIC = 0,
-    FLAG_BASIC_FAST,
     FLAG_STRICT,
-    FLAG_STRICT_FAST,
     FLAG_EXTRA_STRICT,
-    FLAG_EXTRA_STRICT_FAST,
+    FLAG_FAST,
     FLAG_WERROR,
     FLAG_NO_WERROR,
     FLAG_REBUILD,
@@ -66,42 +54,44 @@ int main(int argc, char **argv) {
     FLAG_NO_DEBUG,
     FLAG_PROFILE,
     FLAG_NO_PROFILE,
-
+    FLAG_TEST,
+    FLAG_NO_TEST,
+    
     FLAGS_COUNT,
   };
   
   const char *flags_short_names[FLAGS_COUNT] = {
-    "-b", "-bf",
-    "-s", "-sf",
-    "-es", "-esf",
+    "-b", "-s", "-es", "-f",
     "-we", "-nwe",
     "-rb", "-nrb",
     "-rbr", "-nrbr",
     "-g", "-ng",
     "-p", "-np",
+    "-t", "-nt",
   };
   
   const char *flags_long_names[FLAGS_COUNT] = {
-    "--basic", "--basic-fast",
-    "--strict", "--strict-fast",
-    "--extra-strict", "--extra-strict-fast",
+    "--basic", "--strict", "--extra-strict", "--fast",
     "--werror", "--no-werror",
     "--rebuild", "--no-rebuild",
     "--rebuild-rest", "--no-rebuild-rest",
     "--debug", "--no-debug",
     "--profile", "--no-profile",
+    "--test", "--no-test",
   };
 
   
   bool *flags[FLAGS_COUNT] = {
-    &basic, &basic_fast,
-    &strict, &strict_fast,
-    &extra_strict, &extra_strict_fast,
+    &basic,
+    &strict,
+    &extra_strict,
+    &fast,
     &werror, &no_werror,
     &rebuild, &no_rebuild,
     &rebuild_rest, &no_rebuild_rest,
     &debug, &no_debug,
     &profile, &no_profile,
+    &test, &no_test,
   };
 
   size_t rebuild_index = FLAG_REBUILD;
@@ -128,23 +118,12 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (extra_strict_fast) strict = false;
-
-  if (extra_strict || extra_strict_fast) {
+  if (extra_strict) {
     strict = false;
-    strict_fast = false;
     basic = false;
-    basic_fast = false;
   }
   
-  if (strict_fast) strict = false;
-  
-  if (strict || strict_fast) {
-    basic = false;
-    basic_fast = false;
-  }
-
-  if (basic_fast) basic = false;
+  if (strict) basic = false;
 
   if (no_werror) werror = false;
   if (no_debug) debug = false;
@@ -173,11 +152,9 @@ int main(int argc, char **argv) {
     printf("Recompiling...\n");
     cmd_append(&cmd, "gcc", src_path, "-o", bin_path);
     if (basic) cmd_append(&cmd, CFLAGS_BASIC);
-    else if (basic_fast) cmd_append(&cmd, CFLAGS_BASIC_FAST);
     else if (strict) cmd_append(&cmd, CFLAGS_STRICT);
-    else if (strict_fast) cmd_append(&cmd, CFLAGS_STRICT_FAST);
     else if (extra_strict) cmd_append(&cmd, CFLAGS_EXTRA_STRICT);
-    else if (extra_strict_fast) cmd_append(&cmd, CFLAGS_EXTRA_STRICT_FAST);
+    if (fast) cmd_append(&cmd, "-Ofast");
     if (werror) cmd_append(&cmd, "-Werror");
     if (debug) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
@@ -201,9 +178,9 @@ int main(int argc, char **argv) {
   enum {
     TARE_SOURCE_TARE_C = 0,
     TARE_SOURCE_CMD_H,
+    TARE_SOURCE_CODEGEN_H,
     TARE_SOURCE_DA_H,
     TARE_SOURCE_FLAGS_H,
-    TARE_SOURCE_GENERATOR_H,
     TARE_SOURCE_LEXER_H,
     TARE_SOURCE_PARSER_H,
     TARE_SOURCE_SIMULATOR_H,
@@ -220,7 +197,7 @@ int main(int argc, char **argv) {
   };
   
   static_assert(SOURCES_COUNT == PROGRAMS_COUNT);
-    const char *tare_sources[] = {"./tare.c", "./cmd.h", "./da.h", "./flags.h", "./generator.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h"};
+  const char *tare_sources[] = {"./tare.c", "./cmd.h", "codegen.h", "./da.h", "./flags.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h"};
   const char *test_sources[] = {"./test.c", "./cmd.h", "./str.h"};
   size_t tare_sources_count = sizeof(tare_sources)/sizeof(const char*);
   size_t test_sources_count = sizeof(test_sources)/sizeof(const char*);
@@ -246,48 +223,102 @@ int main(int argc, char **argv) {
 
     cmd_append(&cmd, "gcc", source, "-o", program);
     if (basic) cmd_append(&cmd, CFLAGS_BASIC);
-    else if (basic_fast) cmd_append(&cmd, CFLAGS_BASIC_FAST);
     else if (strict) cmd_append(&cmd, CFLAGS_STRICT);
-    else if (strict_fast) cmd_append(&cmd, CFLAGS_STRICT_FAST);
     else if (extra_strict) cmd_append(&cmd, CFLAGS_EXTRA_STRICT);
-    else if (extra_strict_fast) cmd_append(&cmd, CFLAGS_EXTRA_STRICT_FAST);
+
+    if (fast) cmd_append(&cmd, "-Ofast");
     if (werror) cmd_append(&cmd, "-Werror");
     if (debug) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
 
-  // Temporary, for testing the WIP parser.
-  cmd_append(&cmd, "./tare", "./examples/if.tare");
-  if (!run_cmd(&cmd, redirect, true)) return 1;
-  /* cmd_append(&cmd, "./build/test"); */
-  /* if (!run_cmd(&cmd, redirect, true)) return 1; */
+  if (test) {
+    enum {
+      EXAMPLE_TEST = 0,
+      EXAMPLE_HELLO,
+      EXAMPLE_HELLO_ARABIC,
+      EXAMPLE_HELLO_CHINESE,
+      EXAMPLE_HELLO_HEBREW,
+      Example_HELLO_JAPANESE,
+      EXAMPLE_HELLO_RUSSIAN,
+      EXAMPLE_LOVE,
+      EXAMPLE_IF,
+      EXAMPLE_WHILE,
+      EXAMPLE_HEART,
+      EXAMPLE_FUNC,
+      EXAMPLE_RECURSION,
+      EXAMPLE_READ,
+      EXAMPLE_TAPE,
+      EXAMPLE_TAPE_READ,
+      EXAMPLE_HEAD,
+      EXAMPLES_SYSCALL,
+      EXAMPLES_RETS,
+      EXAMPLES_FUNC_WITH_RETS,
+      EXAMPLES_PUSH,
+      EXAMPLES_OPERATIONS,
+      EXAMPLES_COUNT,
+    };
+
+    const char *examples[EXAMPLES_COUNT] = {
+      "./examples/test.tare",
+      "./examples/hello.tare",
+      "./examples/hello_arabic.tare",
+      "./examples/hello_chinese.tare",
+      "./examples/hello_hebrew.tare",
+      "./examples/hello_japanese.tare",
+      "./examples/hello_russian.tare",
+      "./examples/love.tare",
+      "./examples/if.tare",
+      "./examples/while.tare",
+      "./examples/heart.tare",
+      "./examples/func.tare",
+      "./examples/recursion.tare",
+      "./examples/read.tare",
+      "./examples/tape.tare",
+      "./examples/tape_read.tare",
+      "./examples/head.tare",
+      "./examples/syscall.tare",
+      "./examples/rets.tare",
+      "./examples/func_with_rets.tare",
+      "./examples/push.tare",
+      "./examples/operations.tare",
+    };
+
+    for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
+      if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full");
+      cmd_append(&cmd, "./tare", examples[i]);
+      if (!run_cmd(&cmd, redirect, true)) return 1;
+    }
+  } else {
+    // Temporary, for testing the WIP parser.
+    if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full");
+    cmd_append(&cmd, "./tare", "./examples/recursion.tare");
+    if (!run_cmd(&cmd, redirect, true)) return 1;
+  }
   
   return 0;
 }
 
 void verify_flags(void) {
 #define CFB 3
-#define CFBF 4
 #define CFS 10
-#define CFSF 11
+#define CFES 42
 
   const char *cflags_basic[CFB] = {CFLAGS_BASIC};
-  const char *cflags_basic_fast[CFBF] = {CFLAGS_BASIC_FAST};
   const char *cflags_strict[CFS] = {CFLAGS_STRICT};
-  const char *cflags_strict_fast[CFSF] = {CFLAGS_STRICT_FAST};
+  const char *cflags_extra_strict[CFES] = {CFLAGS_EXTRA_STRICT};
  
   // cflags_basic
   for (size_t i = 0; i < CFB; i++)
     printf("cflags_basic[%zu]: %s\n", i, cflags_basic[i]);
-  // cflags_basic_fast
-  for (size_t i = 0; i < CFBF; i++)
-    printf("cflags_basic_fast[%zu]: %s\n", i, cflags_basic_fast[i]);
+  
   // cflags_strict
   for (size_t i = 0; i < CFS; i++)
     printf("cflags_strict[%zu]: %s\n", i, cflags_strict[i]);
-  // cflags_strict_fast
-  for (size_t i = 0; i < CFSF; i++)
-    printf("cflags_strict_fast[%zu]: %s\n", i, cflags_strict_fast[i]);
+
+  // cflags_extra_strict
+  for (size_t i = 0; i < CFS; i++)
+    printf("cflags_extra_strict[%zu]: %s\n", i, cflags_extra_strict[i]);
 }
 
 TARE_DEF bool needs_rebuild(const char *program, const char *source) {
