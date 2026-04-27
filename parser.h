@@ -540,6 +540,8 @@ TARE_DEF bool parse_expression(Parser *p) {
 
   Operation op = {.start = t->t};
 
+  Token prev = peek_prev_token(t);
+
   switch (t->t->t) {
   case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
   case TOKEN_TYPE_WHOLE_NUM:
@@ -734,15 +736,11 @@ TARE_DEF bool parse_expression(Parser *p) {
     switch (t->t->s) {
     case PAR_BGN:
       {
-        Token prev = peek_prev_token(t);
         size_t end = t->t->jmp;
         while (true) {
           if (!next_token(t)) return false;
           if (t->index == end) break;
           if (!parse_expression(p)) return false;
-        }
-        if (prev.t == TOKEN_TYPE_SPECIAL) {
-          if (prev.s == NOT) return true;
         }
       }
       break;
@@ -843,6 +841,10 @@ TARE_DEF bool parse_expression(Parser *p) {
   default: unimpl("default case in parse_expression token type switch"); break;
   }
 
+  if (prev.t == TOKEN_TYPE_SPECIAL) {
+    if (prev.s == NOT) return true;
+  }
+  
   while (check_for_continued_expression(p)) {
     if (!next_token(t)) return false;
     if (!parse_expression_arithmetics(p)) return false;
