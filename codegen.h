@@ -194,7 +194,7 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
     fprintf(f, "long_imm_%zu dq %zu\n", i, longs.items[i]);
   }
 
-  fprintf(f, "false dq 0\n");
+  /* fprintf(f, "false dq 0\n"); */
   fprintf(f, "true dq 1\n");
 
   fclose(f);
@@ -717,11 +717,11 @@ TARE_DEF void gen_not_op(FILE *f) {
   // Get argument
   gen_pop_from_ops(f);
   
-  fprintf(f, "mov QWORD rcx, QWORD [false]\n");
+  fprintf(f, "xor QWORD rcx, QWORD rcx\n");
   fprintf(f, "cmp QWORD rax, QWORD rcx\n");
   fprintf(f, "cmove QWORD rcx, QWORD [true]\n");
   fprintf(f, "mov QWORD rax, QWORD rcx\n");
-  
+
   gen_push_to_ops(f);
 }
 
@@ -750,7 +750,7 @@ TARE_DEF void gen_logical(Generator *g, FILE *f) {
   // Second argument
   gen_pop_from_ops(f);
   
-  fprintf(f, "mov QWORD rcx, QWORD [false]\n");
+  fprintf(f, "xor QWORD rcx, QWORD rcx\n");
   fprintf(f, "cmp QWORD rax, QWORD rcx\n");
   fprintf(f, "cmovne QWORD rcx, QWORD [true]\n");
   fprintf(f, "mov QWORD rax, QWORD rcx\n");
@@ -758,7 +758,7 @@ TARE_DEF void gen_logical(Generator *g, FILE *f) {
   // First argument
   gen_pop_from_ops_to_reg(f, "rdx");
   
-  fprintf(f, "mov QWORD rbx, QWORD [false]\n");
+  fprintf(f, "xor QWORD rbx, QWORD rbx\n");
   fprintf(f, "cmp QWORD rbx, QWORD rdx\n");
   fprintf(f, "cmovne QWORD rbx, QWORD [true]\n");
   fprintf(f, "mov QWORD rdx, QWORD rbx\n");
@@ -784,7 +784,7 @@ TARE_DEF void gen_comparison_op(Generator *g, FILE *f) {
   gen_pop_from_ops_to_reg(f, "rbx");
 
   // First argument
-  fprintf(f, "mov QWORD rcx, QWORD [false]\n");
+  fprintf(f, "xor QWORD rcx, QWORD rcx\n");
   gen_pop_from_ops(f);
   fprintf(f, "cmp QWORD rax, QWORD rbx\n");
 
