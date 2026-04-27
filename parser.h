@@ -147,7 +147,6 @@ typedef struct {
   Tokenizer *t;
   Functions *funcs;
   Function *func;
-  /* Funcs *fns; */
   Longs *gotos;
   Operations stack;
 } Parser;
