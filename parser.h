@@ -124,6 +124,7 @@ typedef struct {
 
   Vars lvars; // properly implement later
 
+  Token *first;
   size_t start;
   size_t end;
   
@@ -175,6 +176,8 @@ TARE_DEF OpPrec parse_prec_for_next_token(Parser *p);
 TARE_DEF bool is_token_expression(const Token *t);
 
 TARE_DEF bool parse_func_sig(Parser *p);
+
+TARE_DEF bool validate_function_signature(Parser *p, Operation *op, size_t args);
 
 TARE_DEF bool pop_stack(Parser *p);
 TARE_DEF bool op_has_side_effect(Operation *op);
@@ -235,8 +238,8 @@ TARE_DEF bool parse_file(Parser *p) {
   bool debug = false;
   if (debug) print_functions(p);
 
-  p->stack.count = 0;
-  if (p->stack.items) free(p->stack.items);
+  /* p->stack.count = 0; */
+  /* if (p->stack.items) free(p->stack.items); */
   
   return true;
 }
@@ -828,14 +831,19 @@ TARE_DEF bool parse_expression(Parser *p) {
     op.op = t->t->fid;
     if (!expect_special(t, PAR_BGN)) return false;
     {
+      /* Function *fn = p->funcs->items + op.op; */
+      size_t args = 0;
+      // TODO: type-checking
       size_t end = t->t->jmp;
       if (!next_token(t)) return false;
       while (t->index != end) {
         if (!parse_expression(p)) return false;
+        args++;
         if (!expect_special_many(t, SEP, PAR_END)) return false;
         if (t->index == end) break;
         if (!next_token(t)) return false;
       }
+      if (!validate_function_signature(p, &op, args)) return false;
     }
     append_op(p, op);
     break;
@@ -1329,6 +1337,46 @@ TARE_DEF bool parse_func_sig(Parser *p) {
   return true;
 }
 
+TARE_DEF bool validate_function_signature(Parser *p, Operation *op, size_t args) {
+  Function *fn = p->funcs->items + op->op;
+  if (args == fn->args.count) return true;
+
+  Tokenizer *t = p->t;
+  
+  const char *plural = fn->args.count == 1 ? "" : "s";
+  const char *preamble = args > fn->args.count ? "many" : "few";
+  const char *plural2 = args == 1 ? "has" : "have";
+  
+  diag_errf(t, t->t, "too %s arguments! Function `%.*s` requires %zu argument%s, yet %zu %s been provided.\n", preamble, SV_ARG(fn->name), fn->args.count, plural, args, plural2);
+  diag_errf(t, op->start, "incorrect function signature! Function `%.*s` has been defined with the following signature:\n", SV_ARG(fn->name));
+  Token *first = fn->first;
+  Token *last = t->items + fn->start;
+  size_t length = (size_t) (last->f - first->f) + 1;
+  StringView note = {.s = first->f, .l = length};
+  diag_notef(t, first, "%.*s\n", SV_ARG(note));
+
+  length = strlen(t->path);
+  length++; // ':'
+  Loc loc = get_token_loc(t, fn->first);
+  while (loc.row != 0) {
+    loc.row = (loc.row - (loc.row % 10)) / 10;
+    length++;
+  }
+  length++; // ':'
+  while (loc.col != 0) {
+    loc.col = (loc.col - (loc.col % 10)) / 10;
+    length++;
+  }
+  length++; // ':'
+  length++; // ' '
+  length += strlen("note: func ");
+          
+  fprintf(stderr, "%*s^", (int) length, "");
+  for (size_t i = 0; i < 10; i++) fprintf(stderr, "~");
+  fprintf(stderr, "\n");
+  return false;
+}
+
 TARE_DEF bool pop_stack(Parser *p) {
   if (p->stack.count < 1) return false;
   Operation op = p->stack.items[--p->stack.count];
@@ -1473,8 +1521,8 @@ TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns) {
   Token *first = t->t;
   // Get the function's name.
   if (!expect_name(t)) return false;
-  /* Function fn = {.name = sv_from_token(t->t), .first = first}; */
-  Function fn = {.name = sv_from_token(t->t)};
+  Function fn = {.name = sv_from_token(t->t), .first = first};
+  /* Function fn = {.name = sv_from_token(t->t)}; */
   size_t fid = fns->count;
   if (sv_eq(fn.name, fns->items[0].name)) fid = 0;
   assert(fns->count > 0 && "please don't corrupt the memory");
@@ -1846,7 +1894,7 @@ TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
   printf("--------------------------------------------------\n\n");
 }
 
-static_assert(sizeof(Function) == 128, "Struct `Function` has been updated. Make sure debugging works out properly.");
+static_assert(sizeof(Function) == 136, "Struct `Function` has been updated. Make sure debugging works out properly.");
 TARE_DEF void print_function(const Tokenizer *t, const Function *func) {
   printf("\n--------------------------------------------------\n");
   printf("Function `%.*s`\n", SV_ARG(func->name));
