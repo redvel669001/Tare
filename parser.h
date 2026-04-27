@@ -419,7 +419,7 @@ TARE_DEF bool parse_statement(Parser *p) {
       break;
 
     case KEY_ADD: case KEY_SUB:
-    case KEY_MUL: case KEY_DIV:
+    case KEY_MUL: case KEY_DIV: case KEY_MOD:
     case KEY_SHL: case KEY_SHR:
     case KEY_NOT:
     case KEY_BITWISE_AND: case KEY_BITWISE_OR:
@@ -682,7 +682,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       break;
 
     case KEY_ADD: case KEY_SUB:
-    case KEY_MUL: case KEY_DIV:
+    case KEY_MUL: case KEY_DIV: case KEY_MOD:
     case KEY_SHL: case KEY_SHR:
     case KEY_BITWISE_AND: case KEY_BITWISE_OR:
     case KEY_LOGICAL_AND: case KEY_LOGICAL_OR:
@@ -693,6 +693,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       else if (t->t->k == KEY_SUB) op.type = OP_SUB;
       else if (t->t->k == KEY_MUL) op.type = OP_MUL;
       else if (t->t->k == KEY_DIV) op.type = OP_DIV;
+      else if (t->t->k == KEY_MOD) op.type = OP_MOD;
       else if (t->t->k == KEY_SHL) op.type = OP_SHL;
       else if (t->t->k == KEY_SHR) op.type = OP_SHR;
       else if (t->t->k == KEY_BITWISE_AND) op.type = OP_BITWISE_AND;
@@ -1258,7 +1259,7 @@ TARE_DEF bool is_token_expression(const Token *t) {
       return true;
 
     case KEY_ADD: case KEY_SUB:
-    case KEY_MUL: case KEY_DIV:
+    case KEY_MUL: case KEY_DIV: case KEY_MOD:
     case KEY_SHL: case KEY_SHR:
     case KEY_NOT:
     case KEY_BITWISE_AND: case KEY_BITWISE_OR:

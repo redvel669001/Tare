@@ -138,6 +138,7 @@ typedef enum {
   KEY_SUB,
   KEY_MUL,
   KEY_DIV,
+  KEY_MOD,
   KEY_SHL,
   KEY_SHR,
   KEY_NOT,
@@ -158,7 +159,7 @@ typedef enum {
   KEYWORD_TYPES,
 } KeywordType;
 
-static_assert(KEYWORD_TYPES == 46, "Amount of keywords has changed. Please update the `Keywords` StringView array.");
+static_assert(KEYWORD_TYPES == 47, "Amount of keywords has changed. Please update the `Keywords` StringView array.");
 StringView Keywords[KEYWORD_TYPES] = {
   [KEY_F]             = SV_MAKE(f),
   [KEY_B]             = SV_MAKE(b),
@@ -194,6 +195,7 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_SUB]           = SV_MAKE(sub),
   [KEY_MUL]           = SV_MAKE(mul),
   [KEY_DIV]           = SV_MAKE(div),
+  [KEY_MOD]           = SV_MAKE(mod),
   [KEY_SHL]           = SV_MAKE(shl),
   [KEY_SHR]           = SV_MAKE(shr),
   [KEY_NOT]           = SV_MAKE(not),
