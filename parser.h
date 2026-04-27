@@ -1213,7 +1213,6 @@ TARE_DEF OpPrec parse_prec_for_next_token(Parser *p) {
   Token next = peek_next_token(t);
   SpecialType s = next.s;
   OpPrec prec = get_prec_by_special_type(s);
-  /* if (prec != PREC_LESS_GREATER) { */
   if (prec != PREC_LESS_GREATER_LEQUAL_GEQUAL) {
     if (prec != PREC_BITWISE_OR && prec != PREC_BITWISE_AND)
     return prec;
@@ -1223,7 +1222,6 @@ TARE_DEF OpPrec parse_prec_for_next_token(Parser *p) {
   next = peek_forward_token(t, 2);
   if (next.t != TOKEN_TYPE_SPECIAL) return prec;
   if (next.s != s) return prec;
-  /* if (prec != PREC_BITWISE_OR && prec != PREC_BITWISE_AND) */
   if (next.s == OR) return PREC_LOGICAL_OR;
   if (next.s == AND) return PREC_LOGICAL_AND;
   return PREC_SHL_SHR;

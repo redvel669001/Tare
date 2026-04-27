@@ -407,7 +407,7 @@ TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
   case 8: fprintf(f, "cmp QWORD rax, 0\n"); break;
   default: assert(false && "unreachable");
   }
-  
+
   fprintf(f, "jz addr_%zu\n", g->op->op);
 }
 
