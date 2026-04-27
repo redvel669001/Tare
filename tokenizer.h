@@ -44,6 +44,7 @@ typedef enum {
   DOT,
   DEF,
   DIV,
+  MOD,
   MULT,
   ADD,
   SUB,
@@ -56,7 +57,7 @@ typedef enum {
   SPECIAL_TYPES,
 } SpecialType;
 
-static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `Specials` character array.");
+static_assert(SPECIAL_TYPES == 24, "Amount of special characters has changed. Please update the `Specials` character array.");
 const char Specials[SPECIAL_TYPES] = {
   [PAR_BGN] = '(',
   [PAR_END] = ')',
@@ -72,6 +73,7 @@ const char Specials[SPECIAL_TYPES] = {
   [DOT]     = '.',
   [DEF]     = ':',
   [DIV]     = '/',
+  [MOD]     = '%',
   [MULT]    = '*',
   [ADD]     = '+',
   [SUB]     = '-',
@@ -722,7 +724,7 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t);
 
 #ifdef TOKENIZER_IMPLEMENTATION
 
-static_assert(SPECIAL_TYPES == 23, "Amount of special characters has changed. Please update the `special_index` function to properly account for that.");
+static_assert(SPECIAL_TYPES == 24, "Amount of special characters has changed. Please update the `special_index` function to properly account for that.");
 TARE_DEF SpecialType special_index(char c) {
   switch (c) {
   case '(': return PAR_BGN;
@@ -739,6 +741,7 @@ TARE_DEF SpecialType special_index(char c) {
   case '.': return DOT;
   case ':': return DEF;
   case '/': return DIV;
+  case '%': return MOD;
   case '*': return MULT;
   case '+': return ADD;
   case '-': return SUB;

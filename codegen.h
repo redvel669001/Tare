@@ -82,6 +82,7 @@ TARE_DEF void gen_add_op(FILE *f);
 TARE_DEF void gen_sub_op(FILE *f);
 TARE_DEF void gen_mul_op(FILE *f);
 TARE_DEF void gen_div_op(FILE *f);
+TARE_DEF void gen_mod_op(FILE *f);
 TARE_DEF void gen_shl_op(FILE *f);
 TARE_DEF void gen_shr_op(FILE *f);
 TARE_DEF void gen_not_op(FILE *f);
@@ -289,6 +290,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_SUB: gen_sub_op(f); break;
   case OP_MUL: gen_mul_op(f); break;
   case OP_DIV: gen_div_op(f); break;
+  case OP_MOD: gen_mod_op(f); break;
   case OP_SHL: gen_shl_op(f); break;
   case OP_SHR: gen_shr_op(f); break;
   case OP_NOT: gen_not_op(f); break;
@@ -670,6 +672,20 @@ TARE_DEF void gen_div_op(FILE *f) {
   
   fprintf(f, "div QWORD rbx\n");
   gen_push_to_ops(f);
+}
+
+// mod: first % second
+TARE_DEF void gen_mod_op(FILE *f) {
+  // Second argument
+  gen_pop_from_ops_to_reg(f, "rbx");
+
+  // First argument
+  gen_pop_from_ops(f);
+  
+  fprintf(f, "xor QWORD rdx, QWORD rdx\n");
+  
+  fprintf(f, "div QWORD rbx\n");
+  gen_push_to_ops_from_reg(f, "rdx");
 }
 
 // shl: first << second

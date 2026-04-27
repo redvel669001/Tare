@@ -59,6 +59,7 @@ typedef enum {
   OP_SUB,
   OP_MUL,
   OP_DIV,
+  OP_MOD,
   OP_SHL,
   OP_SHR,
   OP_NOT,
@@ -244,7 +245,7 @@ TARE_DEF StringView sv_from_token(const Token *t) {
   return (StringView) {.s = t->f, .l = t->l};
 }
 
-static_assert(OP_TYPES == 45, "update parse_statement");
+static_assert(OP_TYPES == 46, "update parse_statement");
 TARE_DEF bool parse_statement(Parser *p) {
   if (p == NULL) return false;
   
@@ -462,8 +463,8 @@ TARE_DEF bool parse_statement(Parser *p) {
                 "tare statements do not begin with special token `%c`.\n",
                 Specials[t->t->s]);
       return false;
-    case DOT: case DEF: case DIV: case MULT: case ADD: case SUB: 
-    case LESS: case GREATER:
+    case DOT: case DEF: case DIV: case MOD: case MULT:
+    case ADD: case SUB: case LESS: case GREATER:
       diag_errf(t, t->t,
                 "tare statements do not begin with special token `%c`.\n",
                 Specials[t->t->s]);
@@ -532,7 +533,7 @@ TARE_DEF bool parse_statement(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 45, "update parse_expression");
+static_assert(OP_TYPES == 46, "update parse_expression");
 TARE_DEF bool parse_expression(Parser *p) {
   if (p == NULL) return false;
   
@@ -760,7 +761,7 @@ TARE_DEF bool parse_expression(Parser *p) {
       return false;
     case SEP: unimpl("SEP"); break;
       
-    case DIV: case MULT: case ADD: case SUB: case AND: case OR:
+    case DIV: case MOD: case MULT: case ADD: case SUB: case AND: case OR:
       diag_errf(t, t->t,
                 "tare expressions do not begin with special token `%c`.\n",
                 Specials[t->t->s]);
@@ -853,7 +854,7 @@ TARE_DEF bool parse_expression(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 45, "update parse_expression_arithmetics");
+static_assert(OP_TYPES == 46, "update parse_expression_arithmetics");
 TARE_DEF bool parse_expression_arithmetics(Parser *p) {
   if (p == NULL) return false;
   
@@ -881,11 +882,12 @@ TARE_DEF bool parse_expression_arithmetics(Parser *p) {
     return false;
   case SEP: unimpl("SEP"); break;
       
-  case DIV: case MULT: case ADD: case SUB:
+  case DIV: case MOD: case MULT: case ADD: case SUB:
     if (t->t->s == ADD) op.type = OP_ADD;
     else if (t->t->s == SUB) op.type = OP_SUB;
     else if (t->t->s == MULT) op.type = OP_MUL;
     else if (t->t->s == DIV) op.type = OP_DIV;
+    else if (t->t->s == MOD) op.type = OP_MOD;
     else {
       unimpl("in parse expression arithmetic");
       return false;
@@ -1033,7 +1035,7 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
   case OP_POP_FROM_OPS: case OP_TYPES: default: return false;
 
   case OP_ADD: case OP_SUB:
-  case OP_MUL: case OP_DIV:
+  case OP_MUL: case OP_DIV: case OP_MOD:
   case OP_SHL: case OP_SHR:
   case OP_LESS: case OP_LESS_EQUAL:
   case OP_GREATER: case OP_GREATER_EQUAL:
@@ -1045,11 +1047,12 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
       Operation *second = p->func->items + p->func->count - 1;
       Operation *first = second - 1;
       if (first->type != OP_NUM || second->type != OP_NUM) return true;
-      
+
       if (op->type == OP_ADD) op->op = first->op + second->op;
       else if (op->type == OP_SUB) op->op = first->op - second->op;
       else if (op->type == OP_MUL) op->op = first->op * second->op;
       else if (op->type == OP_DIV) op->op = first->op / second->op;
+      else if (op->type == OP_MOD) op->op = first->op % second->op;
       else if (op->type == OP_SHL) op->op = first->op << second->op;
       else if (op->type == OP_SHR) op->op = first->op >> second->op;
       else if (op->type == OP_LESS) op->op = first->op < second->op;
@@ -1123,7 +1126,7 @@ TARE_DEF bool check_for_continued_expression(Parser *p) {
   case BLK_BGN: case BLK_END: case DQUOTE: case SQUOTE:
   case ESC: case SEP: case END: case DOT: case DEF:
     return false;
-  case DIV: case MULT: case ADD: case SUB:
+  case DIV: case MOD: case MULT: case ADD: case SUB:
   case LESS: case GREATER: case EQUAL: case NOT:
   case AND: case OR:
     return true;
@@ -1145,7 +1148,7 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
     return OP_PRECS;
     
   case OP_ADD: case OP_SUB: return PREC_ADD_SUB;
-  case OP_MUL: case OP_DIV: return PREC_MUL_DIV_REM;
+  case OP_MUL: case OP_DIV: case OP_MOD: return PREC_MUL_DIV_REM;
 
   case OP_LESS: case OP_LESS_EQUAL:
     /* return OP_PRECS; // TODO: fix this */
@@ -1180,7 +1183,7 @@ TARE_DEF OpPrec get_prec_by_special_type(SpecialType s) {
   case PAR_END: case GRP_BGN: case GRP_END: case BLK_BGN: case BLK_END:
   case DQUOTE: case SQUOTE: case ESC: case SEP: case END: case DOT: case DEF:
     return OP_PRECS;
-  case DIV: case MULT: return PREC_MUL_DIV_REM;
+  case DIV: case MOD: case MULT: return PREC_MUL_DIV_REM;
   case ADD: case SUB: return PREC_ADD_SUB;
       
   case LESS: case GREATER:
@@ -1285,7 +1288,7 @@ TARE_DEF bool is_token_expression(const Token *t) {
       return false;
     case SEP: return false; // ???
       
-    case DIV: case MULT: case ADD: case SUB: case AND: case OR:
+    case DIV: case MOD: case MULT: case ADD: case SUB: case AND: case OR:
       /* return true; */
       return false;
       
@@ -1359,7 +1362,8 @@ TARE_DEF bool pop_stack(Parser *p) {
 
   case OP_PUSH: case OP_POP: return true;
 
-  case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_SHL: case OP_SHR:
+  case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+  case OP_SHL: case OP_SHR:
     if (!pop_stack(p)) return false;
     if (!pop_stack(p)) return false;
     break;
@@ -1405,7 +1409,7 @@ TARE_DEF bool op_has_side_effect(Operation *op) {
   case OP_PUSH: case OP_POP: return true; // ???
 
   case OP_ADD: case OP_SUB:
-  case OP_MUL: case OP_DIV:
+  case OP_MUL: case OP_DIV: case OP_MOD:
   case OP_SHL: case OP_SHR:
   case OP_NOT:
   case OP_BITWISE_AND: case OP_BITWISE_OR:
@@ -1775,6 +1779,7 @@ TARE_DEF const char *op_type_as_string(OpType type) {
   case OP_SUB: return "OP_SUB";
   case OP_MUL: return "OP_MUL";
   case OP_DIV: return "OP_DIV";
+  case OP_MOD: return "OP_MOD";
   case OP_SHL: return "OP_SHL";
   case OP_SHR: return "OP_SHR";
   case OP_LESS: return "OP_LESS";
