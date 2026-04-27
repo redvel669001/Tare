@@ -1595,7 +1595,6 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
     };
       
     for (Token *tok = t->t; tok < end; tok++) {
-      if (tok->k == KEY_RET) break;
       if (tok->t != TOKEN_TYPE_NAME) continue;
       if (tok_eq(t->t, tok)) {
         switch (scope) {
