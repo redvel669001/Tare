@@ -481,8 +481,6 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
   if (rets_size > 0) fprintf(f, "sub QWORD " RETS_HEAD ", %zu\n", rets_size);
   if (lvars_size > 0) fprintf(f, "sub QWORD " LVARS_HEAD ", %zu\n", lvars_size);
 
-  if (rets_fn == 0) return;
-  
   for (size_t i = 0; i < fn->rets.count; i++) {
     fprintf(f, "xor QWORD rbx, QWORD rbx\n");
     Var ret = fn->rets.items[i];
