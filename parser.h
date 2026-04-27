@@ -335,7 +335,10 @@ TARE_DEF bool parse_statement(Parser *p) {
           if (t->index == op.op) break;
           if (!next_token(t)) return false;
         }
-        p->gotos->count -= 2;
+        if (op.start->k == KEY_WHILE) {
+          if (p->gotos->count < 2) return false;
+          p->gotos->count -= 2;
+        }
         op.start = t->t;
         op.type = OP_GOTO;
         op.op = address.op;
