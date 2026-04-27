@@ -841,7 +841,7 @@ TARE_DEF void gen_assign_op(FILE *f) {
 TARE_DEF void gen_gvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " GLOBAL_VARS_NAME "\n");
-  fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
   gen_push_to_ops(f);
 }
 
@@ -850,21 +850,21 @@ TARE_DEF void gen_lvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   /* fprintf(f, "mov QWORD rax, " LOCAL_VARS_NAME "\n"); */
   fprintf(f, "mov QWORD rax, " LVARS_HEAD "\n");
-  fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
   gen_push_to_ops(f);
 }
 
 TARE_DEF void gen_rvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, QWORD " RETS_HEAD "\n");
-  fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
   gen_push_to_ops(f);
 }
 
 TARE_DEF void gen_avid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " ARGS_HEAD "\n");
-  fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
   gen_push_to_ops(f);
 }
 
