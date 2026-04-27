@@ -752,7 +752,7 @@ TARE_DEF void gen_logical(Generator *g, FILE *f) {
   else if (g->op->type == OP_LOGICAL_OR) inst = "or";
   else assert(false && "unreachable");
 
-  fprintf(f, "%s QWORD rax, QWORD rdx", inst);
+  fprintf(f, "%s QWORD rax, QWORD rdx\n", inst);
 
   gen_push_to_ops(f);
 }
