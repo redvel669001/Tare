@@ -482,11 +482,30 @@ TARE_DEF bool parse_statement(Parser *p) {
   case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
     
-  case TOKEN_TYPE_GVID: unimpl("TOKEN_TYPE_GVID"); break;
-  case TOKEN_TYPE_LVID: unimpl("TOKEN_TYPE_LVID"); break;
+  case TOKEN_TYPE_GVID:
+  case TOKEN_TYPE_LVID:
   case TOKEN_TYPE_RVID:
-    op.type = OP_RVID;
-    op.op = t->t->rvid;
+  case TOKEN_TYPE_AVID:
+    if (t->t->t == TOKEN_TYPE_GVID) {
+      op.type = OP_GVID;
+      op.op = t->t->gvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_LVID) {
+      op.type = OP_LVID;
+      op.op = t->t->lvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_RVID) {
+      op.type = OP_RVID;
+      op.op = t->t->rvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_AVID) {
+      op.type = OP_AVID;
+      op.op = t->t->avid;
+    }
+    else {
+      unimpl("in parse statement");
+      return false;
+    }
     da_append(p->func, op);
     
     op.type = OP_ASSIGN;
@@ -501,9 +520,6 @@ TARE_DEF bool parse_statement(Parser *p) {
       da_append(p->func, op);
     }
     break;
-    unimpl("TOKEN_TYPE_RVID"); break;
-  case TOKEN_TYPE_AVID: unimpl("TOKEN_TYPE_AVID"); break;
-    
   case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
   case TOKEN_TYPE_FID:
     if (!parse_expression(p)) return false;
@@ -777,29 +793,30 @@ TARE_DEF bool parse_expression(Parser *p) {
   case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
     
   case TOKEN_TYPE_GVID:
-    op.type = OP_GVID;
-    op.op = t->t->gvid;
-    append_op(p, op);
-    op.type = OP_DEREF;
-    append_op(p, op);
-    break;
   case TOKEN_TYPE_LVID:
-    op.type = OP_LVID;
-    op.op = t->t->lvid;
-    append_op(p, op);
-    op.type = OP_DEREF;
-    append_op(p, op);
-    break;
   case TOKEN_TYPE_RVID:
-    op.type = OP_RVID;
-    op.op = t->t->rvid;
-    append_op(p, op);
-    op.type = OP_DEREF;
-    append_op(p, op);
-    break;
   case TOKEN_TYPE_AVID:
-    op.type = OP_AVID;
-    op.op = t->t->avid;
+    if (t->t->t == TOKEN_TYPE_GVID) {
+      op.type = OP_GVID;
+      op.op = t->t->gvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_LVID) {
+      op.type = OP_LVID;
+      op.op = t->t->lvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_RVID) {
+      op.type = OP_RVID;
+      op.op = t->t->rvid;
+    }
+    else if (t->t->t == TOKEN_TYPE_AVID) {
+      op.type = OP_AVID;
+      op.op = t->t->avid;
+    }
+    else {
+      unimpl("in parse expression");
+      return false;
+    }
+    
     append_op(p, op);
     op.type = OP_DEREF;
     append_op(p, op);
