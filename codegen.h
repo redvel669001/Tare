@@ -719,7 +719,7 @@ TARE_DEF void gen_not_op(FILE *f) {
   
   fprintf(f, "mov QWORD rcx, QWORD [false]\n");
   fprintf(f, "cmp QWORD rax, QWORD rcx\n");
-  fprintf(f, "cmove QWORD rax, QWORD [true]\n");
+  fprintf(f, "cmove QWORD rcx, QWORD [true]\n");
   fprintf(f, "mov QWORD rax, QWORD rcx\n");
   
   gen_push_to_ops(f);
