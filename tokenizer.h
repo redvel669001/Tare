@@ -296,16 +296,22 @@ typedef enum {
 
 static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please update the `TokenTypeNames` string array.");
 const char *TokenTypeNames[TOKEN_TYPES] = {
-  "name",
-  "whole number",
-  "fractional number",
-  "keyword",
-  "special",
-  "string literal",
-  "character literal",
-  "variable identifier",
-  "type identifier",
-  "function identifier",
+  [TOKEN_TYPE_NAME] = "name",
+  [TOKEN_TYPE_WHOLE_NUM] = "whole number",
+  [TOKEN_TYPE_FRAC_NUM] = "fractional number",
+  [TOKEN_TYPE_KEYWORD] = "keyword",
+  [TOKEN_TYPE_SPECIAL] = "special",
+  [TOKEN_TYPE_STRING] = "string literal",
+  [TOKEN_TYPE_CHAR] = "character literal",
+  
+  
+  [TOKEN_TYPE_GVID] = "global variable identifier",
+  [TOKEN_TYPE_LVID] = "local variable identifier",
+  [TOKEN_TYPE_RVID] = "return value identifier",
+  [TOKEN_TYPE_AVID] = "function argument identifier",
+  
+  [TOKEN_TYPE_TID] = "type identifier",
+  [TOKEN_TYPE_FID] = "function identifier",
 };
 
 // -------------------------------------------------------------------
