@@ -259,9 +259,15 @@ TARE_DEF bool parse_statement(Parser *p) {
     if (!parse_expression(p)) return false;
     if (!expect_special(t, END)) return false;
     if (!pop_stack(p)) return false;
-    if (op_has_side_effect(p->func->items + p->func->count - 1)) {
-      Operation pop = {.start = t->t, .type = OP_POP_FROM_OPS,};
-      da_append(p->func, pop);
+    Operation *operation = p->func->items + p->func->count - 1;
+    if (op_has_side_effect(operation)) {
+      if (operation->type == OP_FUNCALL) {
+        Function *fn = p->funcs->items + operation->op;
+        if (fn->rets.count > 0) {
+          Operation pop = {.start = t->t, .type = OP_POP_FROM_OPS,};
+          da_append(p->func, pop);
+        }
+      }
     } else p->func->count = save;
     return true;
   }
