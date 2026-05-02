@@ -73,6 +73,8 @@ TARE_DEF void gen_tape_op(FILE *f);
 TARE_DEF void gen_head_op(FILE *f);
 TARE_DEF void gen_base_op(FILE *f);
 TARE_DEF void gen_index_op(FILE *f);
+TARE_DEF void gen_length_op(FILE *f);
+
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
 TARE_DEF void gen_push_op(Generator *g, FILE *f);
@@ -281,6 +283,8 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_HEAD: gen_head_op(f); break;
   case OP_BASE: gen_base_op(f); break;
   case OP_INDEX: gen_index_op(f); break;
+  case OP_LENGTH: gen_length_op(f); break;
+    
   case OP_CONST: unimpl("OP_CONST"); break;
 
     // TODO: FIX `push` AND `pop`
@@ -486,7 +490,7 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
   if (args_size > 0) fprintf(f, "sub QWORD " ARGS_HEAD ", %zu\n", args_size);
   if (rets_size > 0) fprintf(f, "sub QWORD " RETS_HEAD ", %zu\n", rets_size);
   if (lvars_size > 0) fprintf(f, "sub QWORD " LVARS_HEAD ", %zu\n", lvars_size);
-
+  
   for (size_t i = 0; i < fn->rets.count; i++) {
     fprintf(f, "xor QWORD rbx, QWORD rbx\n");
     Var ret = fn->rets.items[i];
@@ -592,6 +596,12 @@ TARE_DEF void gen_base_op(FILE *f) {
 TARE_DEF void gen_index_op(FILE *f) {
   fprintf(f, "mov QWORD rax, QWORD " TAPE_HEAD "\n");
   fprintf(f, "sub QWORD rax, " TAPE_BASE "\n");
+  gen_push_to_ops(f);
+}
+
+// length: TAPE_SIZE
+TARE_DEF void gen_length_op(FILE *f) {
+  fprintf(f, "mov QWORD rax, %d\n", TAPE_SIZE);
   gen_push_to_ops(f);
 }
 

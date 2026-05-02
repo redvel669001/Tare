@@ -50,6 +50,8 @@ typedef enum {
   OP_HEAD,
   OP_BASE,
   OP_INDEX,
+  OP_LENGTH,
+  
   OP_CONST,
 
   OP_PUSH,
@@ -248,7 +250,7 @@ TARE_DEF StringView sv_from_token(const Token *t) {
   return (StringView) {.s = t->f, .l = t->l};
 }
 
-static_assert(OP_TYPES == 46, "update parse_statement");
+static_assert(OP_TYPES == 47, "update parse_statement");
 TARE_DEF bool parse_statement(Parser *p) {
   if (p == NULL) return false;
   
@@ -437,6 +439,7 @@ TARE_DEF bool parse_statement(Parser *p) {
       if (!expect_special(t, END)) return false;
       break;
     case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+    case KEY_LENGTH:
       diag_errf(t, t->t,
                 "tare statements do not begin with keyword `%.*s`.\n",
                 SV_ARG(Keywords[t->t->k]));
@@ -568,7 +571,7 @@ TARE_DEF bool parse_statement(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 46, "update parse_expression");
+static_assert(OP_TYPES == 47, "update parse_expression");
 TARE_DEF bool parse_expression(Parser *p) {
   if (p == NULL) return false;
   
@@ -680,10 +683,12 @@ TARE_DEF bool parse_expression(Parser *p) {
       append_op(p, op);
       break;
     case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+    case KEY_LENGTH:
       if (t->t->k == KEY_TAPE) op.type = OP_TAPE;
       else if (t->t->k == KEY_HEAD) op.type = OP_HEAD;
       else if (t->t->k == KEY_BASE) op.type = OP_BASE;
       else if (t->t->k == KEY_INDEX) op.type = OP_INDEX;
+      else if (t->t->k == KEY_LENGTH) op.type = OP_LENGTH;
       else {
         unimpl("in parse expression");
         return false;
@@ -895,7 +900,7 @@ TARE_DEF bool parse_expression(Parser *p) {
   return true;
 }
 
-static_assert(OP_TYPES == 46, "update parse_expression_arithmetics");
+static_assert(OP_TYPES == 47, "update parse_expression_arithmetics");
 TARE_DEF bool parse_expression_arithmetics(Parser *p) {
   if (p == NULL) return false;
   
@@ -1071,7 +1076,7 @@ TARE_DEF bool optimize_expression(Parser *p, Operation *op) {
   case OP_READ_SIZE:
   case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
-  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX: case OP_LENGTH:
   case OP_CONST: case OP_PUSH: case OP_POP: case OP_NUM:
   case OP_POP_FROM_OPS: case OP_TYPES: default: return false;
 
@@ -1183,7 +1188,7 @@ TARE_DEF OpPrec get_prec_by_op_type(OpType type) {
   case OP_READ_SIZE:
   case OP_CONDITIONAL: case OP_GOTO: case OP_ADDRESS:
   case OP_FUNCALL: case OP_RET: case OP_WRITE: case OP_READ: case OP_SYSCALL:
-  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX: case OP_LENGTH:
   case OP_CONST: case OP_PUSH: case OP_POP: case OP_NUM:
   case OP_POP_FROM_OPS: case OP_TYPES:
     return OP_PRECS;
@@ -1290,6 +1295,7 @@ TARE_DEF bool is_token_expression(const Token *t) {
     case KEY_WRITE: case KEY_READ:
     case KEY_SYSCALL:
     case KEY_TAPE: case KEY_HEAD: case KEY_BASE: case KEY_INDEX:
+    case KEY_LENGTH:
       return true;
     case KEY_CONST: return false;
 
@@ -1434,7 +1440,7 @@ TARE_DEF bool pop_stack(Parser *p) {
   case OP_SYSCALL:
     while (op.op--) if (!pop_stack(p)) return false;
     break;
-  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX: case OP_LENGTH:
     break;
     return true;
   case OP_CONST: return true; // not sure how to handle this yet
@@ -1482,7 +1488,8 @@ TARE_DEF bool op_has_side_effect(Operation *op) {
   case OP_WRITE: case OP_READ: case OP_SYSCALL:
     return true;
   
-  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX: return false;
+  case OP_TAPE: case OP_HEAD: case OP_BASE: case OP_INDEX:
+  case OP_LENGTH: return false;
   case OP_CONST: return true; // ????
 
   case OP_PUSH: case OP_POP: return true; // ???
@@ -1848,6 +1855,8 @@ TARE_DEF const char *op_type_as_string(OpType type) {
   case OP_HEAD: return "OP_HEAD";
   case OP_BASE: return "OP_BASE";
   case OP_INDEX: return "OP_INDEX";
+  case OP_LENGTH: return "OP_LENGTH";
+    
   case OP_CONST: return "OP_CONST";
 
   case OP_PUSH: return "OP_PUSH";

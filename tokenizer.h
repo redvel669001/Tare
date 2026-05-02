@@ -112,23 +112,30 @@ typedef enum {
   KEY_S,
   KEY_I,
   KEY_D,
+  
   KEY_R8,
   KEY_R16,
   KEY_R32,
   KEY_R64,
+  
   KEY_IF,
   KEY_WHILE,
   KEY_BREAK,
   KEY_CONT,
+  
   KEY_FUNC,
   KEY_RET,
+  
   KEY_WRITE,
   KEY_READ,
   KEY_SYSCALL,
+  
   KEY_TAPE,
   KEY_HEAD,
   KEY_BASE,
   KEY_INDEX,
+  KEY_LENGTH,
+  
   KEY_CONST,
 
   KEY_PUSH,
@@ -159,7 +166,7 @@ typedef enum {
   KEYWORD_TYPES,
 } KeywordType;
 
-static_assert(KEYWORD_TYPES == 47, "Amount of keywords has changed. Please update the `Keywords` StringView array.");
+static_assert(KEYWORD_TYPES == 48, "Amount of keywords has changed. Please update the `Keywords` StringView array.");
 StringView Keywords[KEYWORD_TYPES] = {
   [KEY_F]             = SV_MAKE(f),
   [KEY_B]             = SV_MAKE(b),
@@ -169,23 +176,30 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_S]             = SV_MAKE(s),
   [KEY_I]             = SV_MAKE(i),
   [KEY_D]             = SV_MAKE(d),
+  
   [KEY_R8]            = SV_MAKE(r8),
   [KEY_R16]           = SV_MAKE(r16),
   [KEY_R32]           = SV_MAKE(r32),
   [KEY_R64]           = SV_MAKE(r64),
+  
   [KEY_IF]            = SV_MAKE(if),
   [KEY_WHILE]         = SV_MAKE(while),
   [KEY_BREAK]         = SV_MAKE(break),
   [KEY_CONT]          = SV_MAKE(continue),
+  
   [KEY_FUNC]          = SV_MAKE(func),
   [KEY_RET]           = SV_MAKE(ret),
-  [KEY_SYSCALL]       = SV_MAKE(syscall),
+  
   [KEY_WRITE]         = SV_MAKE(write),
   [KEY_READ]          = SV_MAKE(read),
+  [KEY_SYSCALL]       = SV_MAKE(syscall),
+  
   [KEY_TAPE]          = SV_MAKE(tape),
   [KEY_HEAD]          = SV_MAKE(head),
   [KEY_BASE]          = SV_MAKE(base),
   [KEY_INDEX]         = SV_MAKE(index),
+  [KEY_LENGTH]        = SV_MAKE(length),
+  
   [KEY_CONST]         = SV_MAKE(const),
   
   [KEY_PUSH]          = SV_MAKE(push),
