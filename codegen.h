@@ -408,15 +408,18 @@ TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
   default: assert(false && "unreachable");
   }
 
-  fprintf(f, "jz addr_%zu\n", g->op->op);
+  /* fprintf(f, "jz addr_%zu\n", g->op->op); */
+  fprintf(f, "jz addr_%zu_%zu\n", g->fni, g->op->op);
 }
 
 TARE_DEF void gen_goto_op(Generator *g, FILE *f) {
-  fprintf(f, "jmp addr_%zu\n", g->op->op);
+  /* fprintf(f, "jmp addr_%zu\n", g->op->op); */
+  fprintf(f, "jmp addr_%zu_%zu\n", g->fni, g->op->op);
 }
 
 TARE_DEF void gen_address_op(Generator *g, FILE *f) {
-  fprintf(f, "addr_%zu:\n", g->op->op);
+  /* fprintf(f, "addr_%zu:\n", g->op->op); */
+  fprintf(f, "addr_%zu_%zu:\n", g->fni, g->op->op);
 }
 
 TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
