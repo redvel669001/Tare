@@ -843,10 +843,33 @@ TARE_DEF void gen_num_op(Generator *g, FILE *f) {
     op %= R64_MAX;
   }
 
-  if (op < R32_MAX) fprintf(f, "mov QWORD rax, %zu\n", op);
+  if (op < ((R32_MAX) >> 1)) fprintf(f, "mov QWORD rax, %zu\n", op);
   else {
     size_t index = find_long(g->longs, op);
     fprintf(f, "mov QWORD rax, [long_imm_%zu]\n", index);
+    
+    /* size_t op2 = op >> 32; */
+    /* size_t op1 = op - (op2 << 32); */
+    
+    /* if (op2 < ((R32_MAX) >> 1)) fprintf(f, "mov QWORD rax, %zu\n", op2); */
+    /* else { */
+    /*   size_t op4 = op2 >> 16; */
+    /*   size_t op3 = op2 - (op4 << 16); */
+    /*   fprintf(f, "mov QWORD rax, %zu\n", op4); */
+    /*   fprintf(f, "shl QWORD rax, 16\n"); */
+    /*   fprintf(f, "or QWORD rax, %zu\n", op3); */
+    /* } */
+    /* fprintf(f, "shl QWORD rax, 32\n"); */
+    /* if (op1 < ((R32_MAX) >> 1)) fprintf(f, "or QWORD rax, %zu\n", op1); */
+    /* else { */
+    /*   size_t op4 = op1 >> 16; */
+    /*   size_t op3 = op1 - (op4 << 16); */
+    /*   fprintf(f, "mov QWORD rbx, %zu\n", op4); */
+    /*   fprintf(f, "shl QWORD rbx, 16\n"); */
+    /*   fprintf(f, "or QWORD rbx, %zu\n", op3); */
+      
+    /*   fprintf(f, "or QWORD rax, QWORD rbx\n"); */
+    /* } */
   }
 
   gen_push_to_ops(f);
