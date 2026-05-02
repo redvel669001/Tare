@@ -189,7 +189,8 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   /* fprintf(f, GVARS_HEAD_NAME " dq 0\n"); */
   fprintf(f, LVARS_HEAD_NAME " dq 0\n");
 
-  if (longs.count > 0) fprintf(f, "segment readable\n");
+  fprintf(f, "segment readable\n");
+  /* if (longs.count > 0) fprintf(f, "segment readable\n"); */
   for (size_t i = 0; i < longs.count; i++) {
     fprintf(f, "long_imm_%zu dq %zu\n", i, longs.items[i]);
   }
