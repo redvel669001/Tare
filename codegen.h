@@ -730,11 +730,11 @@ TARE_DEF void gen_shr_op(FILE *f) {
 TARE_DEF void gen_not_op(FILE *f) {
   // Get argument
   gen_pop_from_ops(f);
-  
-  fprintf(f, "xor QWORD rcx, QWORD rcx\n");
-  fprintf(f, "cmp QWORD rax, QWORD rcx\n");
-  fprintf(f, "cmove QWORD rcx, QWORD [true]\n");
-  fprintf(f, "mov QWORD rax, QWORD rcx\n");
+
+  fprintf(f, "xor QWORD rbx, QWORD rbx\n");
+  fprintf(f, "cmp QWORD rax, QWORD rbx\n");
+  fprintf(f, "cmove QWORD rbx, QWORD [true]\n");
+  fprintf(f, "mov QWORD rax, QWORD rbx\n");
 
   gen_push_to_ops(f);
 }
@@ -764,25 +764,25 @@ TARE_DEF void gen_logical(Generator *g, FILE *f) {
   // Second argument
   gen_pop_from_ops(f);
   
-  fprintf(f, "xor QWORD rcx, QWORD rcx\n");
-  fprintf(f, "cmp QWORD rax, QWORD rcx\n");
-  fprintf(f, "cmovne QWORD rcx, QWORD [true]\n");
-  fprintf(f, "mov QWORD rax, QWORD rcx\n");
+  fprintf(f, "xor QWORD rbx, QWORD rbx\n");
+  fprintf(f, "cmp QWORD rax, QWORD rbx\n");
+  fprintf(f, "cmovne QWORD rbx, QWORD [true]\n");
+  fprintf(f, "mov QWORD rax, QWORD rbx\n");
   
   // First argument
-  gen_pop_from_ops_to_reg(f, "rdx");
+  gen_pop_from_ops_to_reg(f, "rcx");
   
   fprintf(f, "xor QWORD rbx, QWORD rbx\n");
-  fprintf(f, "cmp QWORD rbx, QWORD rdx\n");
+  fprintf(f, "cmp QWORD rbx, QWORD rcx\n");
   fprintf(f, "cmovne QWORD rbx, QWORD [true]\n");
-  fprintf(f, "mov QWORD rdx, QWORD rbx\n");
+  fprintf(f, "mov QWORD rcx, QWORD rbx\n");
 
   const char *inst = "";
   if (g->op->type == OP_LOGICAL_AND) inst = "and";
   else if (g->op->type == OP_LOGICAL_OR) inst = "or";
   else assert(false && "unreachable");
 
-  fprintf(f, "%s QWORD rax, QWORD rdx\n", inst);
+  fprintf(f, "%s QWORD rax, QWORD rcx\n", inst);
 
   gen_push_to_ops(f);
 }
