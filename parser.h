@@ -300,7 +300,8 @@ TARE_DEF bool parse_statement(Parser *p) {
       {
         size_t save = p->func->count;
         Operation address = {.start = op.start, .type = OP_ADDRESS,
-                             .op = t->index};
+                             /* .op = t->index}; */
+                             .op = p->func->count};
         op.type = OP_CONDITIONAL;
         da_append(p->func, address);
         if (!next_token(t)) return false;
@@ -313,48 +314,73 @@ TARE_DEF bool parse_statement(Parser *p) {
         }
         if (!expect_special(t, DEF)) return false;
         if (!next_token(t)) return false;
-        if (t->t->t == TOKEN_TYPE_SPECIAL) {
-          if (t->t->s == BLK_BGN) {
-            op.op = t->t->jmp;
-            if (!next_token(t)) return false;
-          }
-        } else {
-          bool found = false;
-          for (Token *tok = t->t; tok < t->items + t->count; tok++) {
-            if (tok->t != TOKEN_TYPE_SPECIAL) continue;
-            if (tok->s == END) {
-              op.op = (size_t) (tok - t->items);
-              found = true;
-            } else if (tok->s == BLK_BGN) {
-              op.op = t->t->jmp;
-              found = true;
-            }
-            if (found) break;
-          }
-          if (!found) return false;
-        }
-
-        da_append(p->func, op);
+        
+        /* if (t->t->t == TOKEN_TYPE_SPECIAL) { */
+        /*   if (t->t->s == BLK_BGN) { */
+        /*     op.op = t->t->jmp; */
+        /*     if (!next_token(t)) return false; */
+        /*   } */
+        /* } else { */
+        /*   bool found = false; */
+        /*   for (Token *tok = t->t; tok < t->items + t->count; tok++) { */
+        /*     if (tok->t != TOKEN_TYPE_SPECIAL) continue; */
+        /*     if (tok->s == END) { */
+        /*       op.op = (size_t) (tok - t->items); */
+        /*       found = true; */
+        /*     } else if (tok->s == BLK_BGN) { */
+        /*       op.op = t->t->jmp; */
+        /*       found = true; */
+        /*     } */
+        /*     if (found) break; */
+        /*   } */
+        /*   if (!found) return false; */
+        /* } */
+        
+        size_t tokenizer_save = t->index;
+        size_t parser_save = p->func->count;
         if (op.start->k == KEY_WHILE) {
-          da_append(p->gotos, address.op);
-          da_append(p->gotos, op.op);
+          da_append(p->gotos, 0);
+          da_append(p->gotos, 0);
         }
-        while (t->index != op.op) {
-          if (!parse_statement(p)) return false;
-          if (t->index == op.op) break;
-          if (!next_token(t)) return false;
-        }
+        if (!parse_statement(p)) return false;
+        if (!to_token(t, tokenizer_save)) return false;
+        op.op = p->func->count + 1;
+        if (address.start->k == KEY_WHILE) op.op++;
+        p->func->count = parser_save;
+
         if (op.start->k == KEY_WHILE) {
           if (p->gotos->count < 2) return false;
           p->gotos->count -= 2;
         }
+        
+        da_append(p->func, op);
+        
+        if (op.start->k == KEY_WHILE) {
+          da_append(p->gotos, address.op);
+          da_append(p->gotos, op.op);
+        }
+        
+        /* while (t->index != op.op) { */
+        /*   if (!parse_statement(p)) return false; */
+        /*   if (t->index == op.op) break; */
+        /*   if (!next_token(t)) return false; */
+        /* } */
+
+        if (!parse_statement(p)) return false;
+        
+        if (op.start->k == KEY_WHILE) {
+          if (p->gotos->count < 2) return false;
+          p->gotos->count -= 2;
+        }
+        
         op.start = t->t;
         op.type = OP_GOTO;
         op.op = address.op;
         if (address.start->k == KEY_WHILE) da_append(p->func, op);
 
         address.start = t->t;
-        address.op = t->index;
+        /* address.op = t->index; */
+        address.op = p->func->count;
         da_append(p->func, address);
         if (!condition) p->func->count = save;
       }
