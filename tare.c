@@ -80,64 +80,140 @@ int main(int argc, char **argv) {
   if (!paths_from_tare(path, &paths, build)) return 1;
 
   bool time_tokenization = false, time_parsing = false, time_codegen = false;
-  
-  Tokenizer t = {0};
-  size_t start = get_current_time();
-  if (!tokenize_file(paths.path, &t)) return 1;
-  size_t end = get_current_time();
-  if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
 
-  // Simulator is currently deprecated
-  if (flags.items[FLAG_SIMULATE].on) {
-    fprintf(stderr, "Simulation mode isn't supported\n");
-    /* if (!sim_tare(&t)) return 1; */
-    return 0;
+#ifdef THOROUGH_TIMING
+  double tokenization_time_total = 0;
+  double tokenization_time_best = 1;
+  double tokenization_time_worst = 0;
+  
+  double parsing_time_total = 0;
+  double parsing_time_best = 1;
+  double parsing_time_worst = 0;
+  
+  double codegen_time_total = 0;
+  double codegen_time_best = 1;
+  double codegen_time_worst = 0;
+  
+  #define SAMPLE_SIZE 10000
+  for (unsigned int counter = 0; counter < SAMPLE_SIZE; counter++) {
+
+    double current_action_time = 0;
+#endif // THOROUGH_TIMING
+    Tokenizer t = {0};
+    size_t start = get_current_time();
+    if (!tokenize_file(paths.path, &t)) return 1;
+    size_t end = get_current_time();
+#ifdef THOROUGH_TIMING
+    if (time_tokenization) {
+      current_action_time = ((double) end - start) / 1000000000;
+      
+      tokenization_time_total += current_action_time;
+      if (current_action_time > tokenization_time_worst) tokenization_time_worst = current_action_time;
+      if (current_action_time < tokenization_time_best) tokenization_time_best = current_action_time;
+    }
+#else
+    if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
+#endif // THOROUGH_TIMING
+
+    // Simulator is currently deprecated
+    if (flags.items[FLAG_SIMULATE].on) {
+      fprintf(stderr, "Simulation mode isn't supported\n");
+      /* if (!sim_tare(&t)) return 1; */
+      return 0;
+    }
+  
+    Functions funcs = {0};
+    Longs gotos = {0};
+    Vars globals = {0};
+    Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
+    if (time_parsing) start = get_current_time();
+    if (!parse_file(&p)) return 1;
+    if (time_parsing) end = get_current_time();
+#ifdef THOROUGH_TIMING
+    if (time_parsing) {
+      current_action_time = ((double) end - start) / 1000000000;
+      
+      parsing_time_total += current_action_time;
+      if (current_action_time > parsing_time_worst) parsing_time_worst = current_action_time;
+      if (current_action_time < parsing_time_best) parsing_time_best = current_action_time;
+    }
+#else
+    if (time_parsing) print_elapsed_time(start, end, "Parsing");
+#endif // THOROUGH_TIMING
+
+    if (time_codegen) start = get_current_time();
+    if (!gen_fasm(&p, paths.output)) return 1;
+    if (time_codegen) end = get_current_time();
+#ifdef THOROUGH_TIMING
+    if (time_codegen) {
+      current_action_time = ((double) end - start) / 1000000000;
+      
+      codegen_time_total += current_action_time;
+      if (current_action_time > codegen_time_worst) codegen_time_worst = current_action_time;
+      if (current_action_time < codegen_time_best) codegen_time_best = current_action_time;
+    }
+#else
+    if (time_codegen) print_elapsed_time(start, end, "Codegen");
+#endif // THOROUGH_TIMING
+
+#ifndef THOROUGH_TIMING
+    Cmd cmd = {0};
+    int fdout = fileno(stdout);
+    Redirect redirect = {0};
+    close(fdout);
+  
+    cmd_append(&cmd, "fasm", paths.fasm_input);
+    if (!run_cmd(&cmd, redirect, true)) return 1;
+
+    cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+    if (!run_cmd(&cmd, redirect, true)) return 1;
+
+    if (t.l.items) free(t.l.items);
+    if (t.items) free(t.items);
+    if (cmd.items) free(cmd.items);
+    if (flags.items) free(flags.items);
+    if (paths.arena.items) free(paths.arena.items);
+    if (prog.items) free(prog.items);
+  
+    for (size_t i = 0 ; i < funcs.count; i++) {
+      Function fn = funcs.items[i];
+      if (fn.items) free(fn.items);
+      if (fn.lvars.items) free(fn.lvars.items);
+      if (fn.args.items) free(fn.args.items);
+      if (fn.rets.items) free(fn.rets.items);
+    }
+
+    if (p.stack.items) free(p.stack.items);
+
+    if (funcs.items) free(funcs.items);
+
+    if (gotos.items) free(gotos.items);
+#else
   }
+
+  double tokenization_time_average = tokenization_time_total / SAMPLE_SIZE;
+  double parsing_time_average = parsing_time_total / SAMPLE_SIZE;
+  double codegen_time_average = codegen_time_total / SAMPLE_SIZE;
+
+  printf("Tokenization:\n");
+  printf("    Total: %lf\n", tokenization_time_total);
+  printf("    Average: %lf\n", tokenization_time_average);
+  printf("    Best: %lf\n", tokenization_time_best);
+  printf("    Worst: %lf\n", tokenization_time_worst);
   
-  Functions funcs = {0};
-  Longs gotos = {0};
-  Vars globals = {0};
-  Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
-  if (time_parsing) start = get_current_time();
-  if (!parse_file(&p)) return 1;
-  if (time_parsing) end = get_current_time();
-  if (time_parsing) print_elapsed_time(start, end, "Parsing");
-  if (time_codegen) start = get_current_time();
-  if (!gen_fasm(&p, paths.output)) return 1;
-  if (time_codegen) end = get_current_time();
-  if (time_codegen) print_elapsed_time(start, end, "Codegen");
+  printf("Parsing:\n");
+  printf("    Total: %lf\n", parsing_time_total);
+  printf("    Average: %lf\n", parsing_time_average);
+  printf("    Best: %lf\n", parsing_time_best);
+  printf("    Worst: %lf\n", parsing_time_worst);
+
+  printf("Codegen:\n");
+  printf("    Total: %lf\n", codegen_time_total);
+  printf("    Average: %lf\n", codegen_time_average);
+  printf("    Best: %lf\n", codegen_time_best);
+  printf("    Worst: %lf\n", codegen_time_worst);
   
-  Cmd cmd = {0};
-  int fdout = fileno(stdout);
-  Redirect redirect = {0};
-  close(fdout);
-  
-  cmd_append(&cmd, "fasm", paths.fasm_input);
-  if (!run_cmd(&cmd, redirect, true)) return 1;
-
-  cmd_append(&cmd, "chmod", "+x", paths.output_bin);
-  if (!run_cmd(&cmd, redirect, true)) return 1;
-
-  if (t.l.items) free(t.l.items);
-  if (t.items) free(t.items);
-  if (cmd.items) free(cmd.items);
-  if (flags.items) free(flags.items);
-  if (paths.arena.items) free(paths.arena.items);
-  if (prog.items) free(prog.items);
-  
-  for (size_t i = 0 ; i < funcs.count; i++) {
-    Function fn = funcs.items[i];
-    if (fn.items) free(fn.items);
-    if (fn.lvars.items) free(fn.lvars.items);
-    if (fn.args.items) free(fn.args.items);
-    if (fn.rets.items) free(fn.rets.items);
-  }
-
-  if (p.stack.items) free(p.stack.items);
-
-  if (funcs.items) free(funcs.items);
-
-  if (gotos.items) free(gotos.items);
+#endif // THOROUGH_TIMING
   
   return 0;
 }
