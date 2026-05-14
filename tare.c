@@ -86,7 +86,8 @@ int main(int argc, char **argv) {
   
   Functions funcs = {0};
   Longs gotos = {0};
-  Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos};
+  Vars globals = {0};
+  Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
   if (!parse_file(&p)) return 1;
   if (!gen_fasm(&p, paths.output)) return 1;
   
@@ -111,9 +112,12 @@ int main(int argc, char **argv) {
   for (size_t i = 0 ; i < funcs.count; i++) {
     Function fn = funcs.items[i];
     if (fn.items) free(fn.items);
+    if (fn.lvars.items) free(fn.lvars.items);
     if (fn.args.items) free(fn.args.items);
     if (fn.rets.items) free(fn.rets.items);
   }
+
+  if (p.stack.items) free(p.stack.items);
 
   if (funcs.items) free(funcs.items);
 

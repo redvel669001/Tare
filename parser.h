@@ -18,7 +18,7 @@ typedef enum {
 } ScopeType;
 
 typedef struct {
-  ScopeType scope;
+  ScopeType type;
   size_t vid;
   size_t tid;
   StringView name;
@@ -124,7 +124,7 @@ typedef struct {
   Vars args;
   Vars rets;
 
-  Vars lvars; // properly implement later
+  Vars lvars;
 
   Token *first;
   size_t start;
@@ -152,6 +152,7 @@ typedef struct {
   Functions *funcs;
   Function *func;
   Longs *gotos;
+  Vars *globals;
   Operations stack;
 } Parser;
 
@@ -189,6 +190,9 @@ TARE_DEF bool patch_tokenizer_funcs(Tokenizer *t, Functions *fns);
 TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns);
 TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args);
 TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t);
+
+TARE_DEF bool patch_tokenizer_gvids(Parser *p);
+TARE_DEF bool patch_tokenizer_lvids(Parser *p);
 
 TARE_DEF size_t get_vars_size(Vars *vars);
 TARE_DEF size_t get_vars_size_with_padding(Vars *vars);
@@ -229,6 +233,9 @@ TARE_DEF bool parse_file(Parser *p) {
   Function main = {.name = SV_MAKE(main)};
   da_append(p->funcs, main);
   if (!patch_tokenizer_funcs(t, p->funcs)) return false;
+
+  if (!patch_tokenizer_gvids(p)) return false;
+  if (!patch_tokenizer_lvids(p)) return false;
 
   p->func = p->funcs->items;
 
@@ -559,7 +566,14 @@ TARE_DEF bool parse_statement(Parser *p) {
       da_append(p->func, op);
     }
     break;
-  case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
+  case TOKEN_TYPE_TID:
+    if (!next_token(t)) return false;
+    if (t->t->t != TOKEN_TYPE_GVID &&
+        t->t->t != TOKEN_TYPE_LVID &&
+        t->t->t != TOKEN_TYPE_RVID &&
+        t->t->t != TOKEN_TYPE_AVID) return false;
+    if (!expect_special(t, END)) return false;
+    break;
   case TOKEN_TYPE_FID:
     if (!parse_expression(p)) return false;
     if (!expect_special(t, END)) return false;
@@ -1651,7 +1665,7 @@ TARE_DEF bool patch_tokenizer_func(Tokenizer *t, Functions *fns) {
 
 TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
   size_t vid = 0;
-  ScopeType scope = 0;
+  ScopeType scope_type = 0;
   Token *end = t->items + fn->end;
 
   while (t->t->s != PAR_END) {
@@ -1667,11 +1681,11 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
     if (!expect_name(t)) return false;
     if (args) {
       vid = fn->args.count;
-      scope = SCOPE_ARGUMENT;
+      scope_type = SCOPE_ARGUMENT;
     }
     else {
       vid = fn->rets.count;
-      scope = SCOPE_RETURN;
+      scope_type = SCOPE_RETURN;
     }
     /* vid = fn->args.count + fn->rets.count; // TODO: make this actually work */
     
@@ -1679,13 +1693,13 @@ TARE_DEF bool patch_tokenizer_args(Tokenizer *t, Function *fn, bool args) {
       .name = sv_from_token(t->t),
       .vid = vid,
       .tid = tid,
-      .scope = scope,
+      .type = scope_type,
     };
       
     for (Token *tok = t->t; tok < end; tok++) {
       if (tok->t != TOKEN_TYPE_NAME) continue;
       if (tok_eq(t->t, tok)) {
-        switch (scope) {
+        switch (scope_type) {
         case SCOPE_GLOBAL:
           assert(false && "SCOPE_GLOBAL should be impossible");
           break;
@@ -1788,6 +1802,92 @@ TARE_DEF bool patch_tokenizer_bgn_end(Tokenizer *t) {
   if (blk.items) free(blk.items);
   
   return (par.count == 0) && (grp.count == 0) && (blk.count == 0);
+}
+
+TARE_DEF bool patch_tokenizer_gvids(Parser *p) {
+  Tokenizer *t = p->t;
+  Vars *globals = p->globals;
+  size_t save = t->index;
+
+  if (!first_token(t)) return false;
+
+  // The way structs and enums will likely be implemented, this will
+  // need to be modified.
+  do {
+    if (t->t->t == TOKEN_TYPE_FID) {
+      Function *func = p->funcs->items + t->t->fid;
+      if (!to_token(t, func->end)) return false;
+    }
+    if (t->t->t != TOKEN_TYPE_TID) continue;
+    size_t tid = t->t->tid;
+    if (!expect_name(t)) return false;
+    Var var = {
+      .type = SCOPE_GLOBAL,
+      .vid = globals->count, .tid = tid,
+      .name = sv_from_token(t->t),
+    };
+    for (size_t i = 0; i < t->count; i++) {
+      Token *tok = t->items + i;
+      if (tok->t != TOKEN_TYPE_NAME) continue;
+      if (tok_eq(t->t, tok)) {
+        tok->t = TOKEN_TYPE_GVID;
+        tok->gvid = var.vid;
+      }
+    }
+    if (!expect_special(t, END)) return false;
+    da_append(globals, var);
+  } while (next_token(t));
+  
+  return to_token(t, save);
+}
+
+TARE_DEF bool patch_tokenizer_lvids(Parser *p) {
+  Tokenizer *t = p->t;
+  size_t save = t->index;
+  
+  Longs scopes = {0};
+  
+  for (size_t i = 0; i < p->funcs->count; i++) {
+    Function *func = p->funcs->items + i;
+    if (!to_token(t, func->start)) return false;
+    Vars *lvars = &func->lvars;
+
+    da_append(&scopes, t->index);
+    
+    while (next_token(t)) {
+      if (t->index >= func->end) break;
+
+      if (t->t->t == TOKEN_TYPE_SPECIAL) {
+        if (t->t->s == BLK_BGN) da_append(&scopes, t->index);
+        else if (t->t->s == BLK_END) scopes.count--;
+      }
+      if (t->t->t != TOKEN_TYPE_TID) continue;
+      size_t tid = t->t->tid;
+      if (!expect_name(t)) return false;
+      
+      Var var = {
+        .type = SCOPE_LOCAL,
+        .vid = lvars->count, .tid = tid,
+        .name = sv_from_token(t->t),
+      };
+
+      Token *scope_start = t->items + scopes.items[scopes.count - 1];
+      Token *scope_end = t->items + scope_start->jmp;
+      for (Token *tok = scope_start; tok < scope_end; tok++) {
+        if (tok->t != TOKEN_TYPE_NAME) continue;
+        if (tok_eq(t->t, tok)) {
+          tok->t = TOKEN_TYPE_LVID;
+          tok->gvid = var.vid;
+        }
+      }
+      if (!expect_special(t, END)) return false;
+      da_append(lvars, var);
+    } 
+  }
+
+  if (scopes.items) free(scopes.items);
+
+  return to_token(t, save);
 }
 
 TARE_DEF size_t get_vars_size(Vars *vars) {
@@ -1903,10 +2003,10 @@ static_assert(sizeof(Var) == 48, "Struct `Var` has been updated. Make sure debug
 TARE_DEF void print_var(const Var *var, size_t i) {
   printf("--------------------------------------------------\n");
   printf("Var (%zu) = {\n", i);
-  printf("  scope = %u\n", var->scope);
-  printf("  vid = %zu\n", var->vid);
-  printf("  tid = %zu\n", var->tid);
-  printf("  name = %.*s\n", SV_ARG(var->name));
+  printf("  .type = %u\n", var->type);
+  printf("  .vid = %zu\n", var->vid);
+  printf("  .tid = %zu\n", var->tid);
+  printf("  .name = %.*s\n", SV_ARG(var->name));
   printf("}\n");
   printf("--------------------------------------------------\n");
 }
@@ -1952,11 +2052,12 @@ TARE_DEF void print_function(const Tokenizer *t, const Function *func) {
   printf("\n--------------------------------------------------\n");
 }
 
-static_assert(sizeof(Parser) == 56, "Struct `Parser` has been updated. Make sure debugging works out properly.");
+static_assert(sizeof(Parser) == 64, "Struct `Parser` has been updated. Make sure debugging works out properly.");
 TARE_DEF void print_functions(const Parser *p) {
   for (size_t i = 0; i < p->funcs->count; i++) {
     Function *func = p->funcs->items + i;
     print_function(p->t, func);
+    print_vars(p->globals);
   }
 }
 
