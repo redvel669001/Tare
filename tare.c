@@ -33,6 +33,8 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 /* #define SIMULATOR_IMPLEMENTATION */
 /* #include "simulator.h" */
 
+#include <time.h>
+
 typedef struct {
   const char *path;
   const char *output;
@@ -45,6 +47,9 @@ typedef struct {
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
 TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
 TARE_DEF void str_to_tare_template(const char *string); // Testing thing
+
+TARE_DEF size_t get_current_time(void);
+TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
 
 int main(int argc, char **argv) {
   StringView src = SV_MAKE(./examples/);
@@ -73,9 +78,14 @@ int main(int argc, char **argv) {
   Paths paths = {.src = src};
   StringView build = SV_MAKE(build/);
   if (!paths_from_tare(path, &paths, build)) return 1;
+
+  bool time_tokenization = false, time_parsing = false, time_codegen = false;
   
   Tokenizer t = {0};
+  size_t start = get_current_time();
   if (!tokenize_file(paths.path, &t)) return 1;
+  size_t end = get_current_time();
+  if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
 
   // Simulator is currently deprecated
   if (flags.items[FLAG_SIMULATE].on) {
@@ -88,8 +98,14 @@ int main(int argc, char **argv) {
   Longs gotos = {0};
   Vars globals = {0};
   Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
+  if (time_parsing) start = get_current_time();
   if (!parse_file(&p)) return 1;
+  if (time_parsing) end = get_current_time();
+  if (time_parsing) print_elapsed_time(start, end, "Parsing");
+  if (time_codegen) start = get_current_time();
   if (!gen_fasm(&p, paths.output)) return 1;
+  if (time_codegen) end = get_current_time();
+  if (time_codegen) print_elapsed_time(start, end, "Codegen");
   
   Cmd cmd = {0};
   int fdout = fileno(stdout);
@@ -188,4 +204,14 @@ TARE_DEF void str_to_tare_template(const char *string) {
       i += 1;
     }
   }
+}
+
+TARE_DEF size_t get_current_time(void) {
+  static struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  return (size_t)ts.tv_sec * 1000000000LL + (size_t)ts.tv_nsec;
+}
+
+TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) {
+  printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
 }
