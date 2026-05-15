@@ -432,9 +432,11 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
 
   size_t args_fn = get_args_size(fn);
   size_t rets_fn = get_rets_size(fn);
+  size_t lvars_fn = get_lvars_size(fn);
   
   if (args_fn % 8 != 0) args_fn += (8 - args_fn % 8);
   if (rets_fn % 8 != 0) rets_fn += (8 - rets_fn % 8);
+  if (lvars_fn % 8 != 0) lvars_fn += (8 - lvars_fn % 8);
   
   Function *fni = g->fns->items + g->fni;
   
@@ -449,6 +451,35 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
   if (args_size > 0) fprintf(f, "add QWORD " ARGS_HEAD ", %zu\n", args_size);
   if (rets_size > 0) fprintf(f, "add QWORD " RETS_HEAD ", %zu\n", rets_size);
   if (lvars_size > 0) fprintf(f, "add QWORD " LVARS_HEAD ", %zu\n", lvars_size);
+
+  if (lvars_fn > 0) {
+    fprintf(f, "mov QWORD rax, QWORD " LVARS_HEAD "\n");
+    fprintf(f, "add QWORD rax, %zu\n", lvars_fn);
+  }
+  
+  for (size_t i = 0; i < fn->lvars.count; i++) {
+    Var var = fn->lvars.items[i];
+    switch (var.tid) {
+    case TYPE_U8:
+      fprintf(f, "sub rax, 1\n");
+      fprintf(f, "mov BYTE [rax], 0\n");
+      break;
+    case TYPE_U16:
+      fprintf(f, "sub rax, 2\n");
+      fprintf(f, "mov WORD [rax], 0\n");
+      break;
+    case TYPE_U32:
+      fprintf(f, "sub rax, 4\n");
+      fprintf(f, "mov DWORD [rax], 0\n");
+      break;
+    case TYPE_U64:
+      fprintf(f, "sub rax, 8\n");
+      fprintf(f, "mov QWORD [rax], 0\n");
+      break;
+    case TYPES_COUNT:
+    default: assert(false && "unimplemented");
+    }
+  }  
   
   if (args_fn > 0) {
     fprintf(f, "mov QWORD rax, QWORD " ARGS_HEAD "\n");
@@ -890,7 +921,6 @@ TARE_DEF void gen_assign_op(FILE *f) {
   fprintf(f, "mov QWORD [rax], QWORD rbx\n");
 }
 
-// TODO: make sure this works
 TARE_DEF void gen_gvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " GLOBAL_VARS_NAME "\n");
@@ -898,10 +928,8 @@ TARE_DEF void gen_gvid_op(Generator *g, FILE *f) {
   gen_push_to_ops(f);
 }
 
-// TODO: make sure this works
 TARE_DEF void gen_lvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
-  /* fprintf(f, "mov QWORD rax, " LOCAL_VARS_NAME "\n"); */
   fprintf(f, "mov QWORD rax, " LVARS_HEAD "\n");
   if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
   gen_push_to_ops(f);

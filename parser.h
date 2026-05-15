@@ -532,38 +532,66 @@ TARE_DEF bool parse_statement(Parser *p) {
   case TOKEN_TYPE_LVID:
   case TOKEN_TYPE_RVID:
   case TOKEN_TYPE_AVID:
-    if (t->t->t == TOKEN_TYPE_GVID) {
-      op.type = OP_GVID;
-      op.op = t->t->gvid;
-    }
-    else if (t->t->t == TOKEN_TYPE_LVID) {
-      op.type = OP_LVID;
-      op.op = t->t->lvid;
-    }
-    else if (t->t->t == TOKEN_TYPE_RVID) {
-      op.type = OP_RVID;
-      op.op = t->t->rvid;
-    }
-    else if (t->t->t == TOKEN_TYPE_AVID) {
-      op.type = OP_AVID;
-      op.op = t->t->avid;
-    }
-    else {
-      unimpl("in parse statement");
-      return false;
-    }
-    da_append(p->func, op);
+    {
+      if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+        if (peek_next_token(t).s == END) break;
+      }
     
-    op.type = OP_ASSIGN;
-    if (!expect_special_many(t, SEP, EQUAL)) return false;
-    if (t->t->s == SEP) {
-      unimpl("SEP in TOKEN_TYPE_RVID");
-      return false;
-    }
-    if (t->t->s == EQUAL) {
-      if (!next_token(t)) return false;
-      if (!parse_expression(p)) return false;
+      if (t->t->t == TOKEN_TYPE_GVID) {
+        op.type = OP_GVID;
+        op.op = t->t->gvid;
+      }
+      else if (t->t->t == TOKEN_TYPE_LVID) {
+        op.type = OP_LVID;
+        op.op = t->t->lvid;
+      }
+      else if (t->t->t == TOKEN_TYPE_RVID) {
+        op.type = OP_RVID;
+        op.op = t->t->rvid;
+      }
+      else if (t->t->t == TOKEN_TYPE_AVID) {
+        op.type = OP_AVID;
+        op.op = t->t->avid;
+      }
+      else {
+        unimpl("in parse statement");
+        return false;
+      }
+      
+      size_t lhs_index = p->func->count;
       da_append(p->func, op);
+    
+      op.type = OP_ASSIGN;
+      if (!expect_special_many(t, SEP, EQUAL)) return false;
+      if (t->t->s == SEP) {
+        unimpl("SEP in TOKEN_TYPE_RVID");
+        return false;
+      }
+      if (t->t->s == EQUAL) {
+        if (!next_token(t)) return false;
+        if (!parse_expression(p)) return false;
+        da_append(p->func, op);
+      }
+
+      Operation *lhs = p->func->items + lhs_index;
+      size_t potential_tid_index = (size_t) (lhs->start - t->items - 1);
+      if (!check_bounds(potential_tid_index, t->count)) break;
+      Token *potential_tid = t->items + potential_tid_index;
+      if (potential_tid->t != TOKEN_TYPE_TID) break;
+      size_t error_index = 0;
+      bool error = false;
+      for (size_t i = lhs_index + 1; i < p->func->count; i++) {
+        Operation *rhs = p->func->items + i;
+        if (lhs->type != rhs->type) continue;
+        if (lhs->op != rhs->op) continue;
+        error = true;
+        error_index = i;
+        break;
+      }
+      if (!error) break;
+      Operation *error_op = p->func->items + error_index;
+      diag_errf(t, lhs->start, "can't use variable `%.*s` in the expression assigned to itself at decleration!\n", TOK_ARG(lhs->start));
+      diag_notef(t, error_op->start, "attempted use of `%.*s` in assignment while declaring it here.\n", TOK_ARG(error_op->start));
     }
     break;
   case TOKEN_TYPE_TID:
@@ -572,7 +600,7 @@ TARE_DEF bool parse_statement(Parser *p) {
         t->t->t != TOKEN_TYPE_LVID &&
         t->t->t != TOKEN_TYPE_RVID &&
         t->t->t != TOKEN_TYPE_AVID) return false;
-    if (!expect_special(t, END)) return false;
+    if (!parse_statement(p)) return false;
     break;
   case TOKEN_TYPE_FID:
     if (!parse_expression(p)) return false;
@@ -1834,7 +1862,7 @@ TARE_DEF bool patch_tokenizer_gvids(Parser *p) {
         tok->gvid = var.vid;
       }
     }
-    if (!expect_special(t, END)) return false;
+    if (!expect_special_many(t, END, EQUAL)) return false;
     da_append(globals, var);
   } while (next_token(t));
   
@@ -1871,16 +1899,17 @@ TARE_DEF bool patch_tokenizer_lvids(Parser *p) {
         .name = sv_from_token(t->t),
       };
 
-      Token *scope_start = t->items + scopes.items[scopes.count - 1];
-      Token *scope_end = t->items + scope_start->jmp;
-      for (Token *tok = scope_start; tok < scope_end; tok++) {
+      Token *start = t->t;
+      Token *scope = t->items + scopes.items[scopes.count - 1];
+      Token *end = t->items + scope->jmp;
+      for (Token *tok = start; tok < end; tok++) {
         if (tok->t != TOKEN_TYPE_NAME) continue;
         if (tok_eq(t->t, tok)) {
           tok->t = TOKEN_TYPE_LVID;
           tok->gvid = var.vid;
         }
       }
-      if (!expect_special(t, END)) return false;
+      if (!expect_special_many(t, END, EQUAL)) return false;
       da_append(lvars, var);
     } 
   }
