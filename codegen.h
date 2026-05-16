@@ -268,7 +268,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_PTR_ADD: gen_ptr_add_op(g, f); break;
   case OP_PTR_SUB: gen_ptr_sub_op(g, f); break;
   case OP_ELEM_ADD: gen_elem_add_op(g, f); break;
-  case OP_ELEM_SUB: gen_elem_add_op(g, f); break;
+  case OP_ELEM_SUB: gen_elem_sub_op(g, f); break;
   case OP_READ_SIZE: if (!gen_read_size_op(g, op->op)) return false; break;
   case OP_CONDITIONAL: gen_conditional_op(g, f); break;
   case OP_GOTO: gen_goto_op(g, f); break;
