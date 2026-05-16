@@ -376,10 +376,10 @@ TARE_DEF void gen_elem_sub_op(Generator *g, FILE *f) {
   
   fprintf(f, "mov QWORD rbx, QWORD " TAPE_HEAD "\n");
   switch (g->r) {
-  case 1: fprintf(f, "sub BYTE [rbx], al\n");
-  case 2: fprintf(f, "sub WORD [rbx], ax\n");
-  case 4: fprintf(f, "sub DWORD [rbx], eax\n");
-  case 8: fprintf(f, "sub QWORD [rbx], QWORD rax\n");
+  case 1: fprintf(f, "sub BYTE [rbx], al\n"); break;
+  case 2: fprintf(f, "sub WORD [rbx], ax\n"); break;
+  case 4: fprintf(f, "sub DWORD [rbx], eax\n"); break;
+  case 8: fprintf(f, "sub QWORD [rbx], QWORD rax\n"); break;
   default: assert(false && "unreachable");
   }
 
