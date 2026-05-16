@@ -1,3 +1,5 @@
+/* #define THOROUGH_TIMING */
+
 #define CMD_IMPLEMENTATION
 #include "cmd.h"
 

@@ -201,7 +201,10 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   fprintf(f, "true dq 1\n");
 
   fclose(f);
+
+#ifndef THOROUGH_TIMING
   printf("Successfully generated file %s\n", output);
+#endif // THOROUGH_TIMING
 
   if (gen.longs->items) free(gen.longs->items);
   if (gen.gotos->items) free(gen.gotos->items);
