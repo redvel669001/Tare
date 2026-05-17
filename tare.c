@@ -183,6 +183,7 @@ int main(int argc, char **argv) {
     if (!run_cmd(&cmd, redirect, display)) return 1;
     if (time_fasm) end = get_current_time();
 
+    if (logs) fclose(logs);
 #ifdef THOROUGH_TIMING
     if (time_fasm) {
       current_action_time = ((double) end - start) / 1000000000;
