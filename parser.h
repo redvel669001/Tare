@@ -1964,6 +1964,19 @@ TARE_DEF size_t get_lvars_size(Function *fn) {
   return get_vars_size(&fn->lvars);
 }
 
+TARE_DEF size_t get_args_size_with_padding(Function *fn) {
+  return get_vars_size_with_padding(&fn->args);
+}
+
+TARE_DEF size_t get_rets_size_with_padding(Function *fn) {
+  return get_vars_size_with_padding(&fn->rets);
+}
+
+TARE_DEF size_t get_lvars_size_with_padding(Function *fn) {
+  return get_vars_size_with_padding(&fn->lvars);
+}
+
+
 TARE_DEF const char *op_type_as_string(OpType type) {
   switch (type) {
   case OP_PTR_ADD: return "OP_PTR_ADD";
