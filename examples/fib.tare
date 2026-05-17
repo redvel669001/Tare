@@ -123,7 +123,9 @@ func print_fibs3(u64 first, u64 last): {
     print_num(fib_3(first));
     // r64
     // inc
-    first = first + 1;
+    // first = first + 1;
+    // first += 1;
+    first++;
   }
   ret;
 }
@@ -142,8 +144,9 @@ func fib_3(u64 ind) => (u64 result): {
     ret;
   }
 
+  result = fib2;
   if (ind == 1): {
-    result = fib2;
+    // result = fib2;
     ret;
   }
 
@@ -151,10 +154,13 @@ func fib_3(u64 ind) => (u64 result): {
   // counter = 0;
 
   while (counter < ind): {
-    result = fib1 + fib2;
+    // result = fib1 + fib2;
+    result += fib1;
     fib1 = fib2;
     fib2 = result;
-    counter = counter + 1;
+    // counter = counter + 1;
+    // counter += 1;
+    counter++;
   }
 
   // result = buf;

@@ -561,15 +561,100 @@ TARE_DEF bool parse_statement(Parser *p) {
       size_t lhs_index = p->func->count;
       da_append(p->func, op);
     
-      op.type = OP_ASSIGN;
-      if (!expect_special_many(t, SEP, EQUAL)) return false;
+      if (!expect_special_many(t, SEP, EQUAL,
+                               DIV, MOD, MULT, ADD, SUB, AND, OR))
+        return false;
+
+      Operation potential_arithmetics = {.start = t->t};
+      if (t->t->s == DIV) {
+        potential_arithmetics.type = OP_DIV;
+      } else if (t->t->s == MOD) {
+        potential_arithmetics.type = OP_MOD;
+      } else if (t->t->s == MULT) {
+        potential_arithmetics.type = OP_MUL;
+      } else if (t->t->s == ADD) {
+        potential_arithmetics.type = OP_ADD;
+        if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+          if (peek_next_token(t).s != EQUAL) {
+            if (!expect_special(t, ADD)) return false;
+            if (!expect_special_many(t, END, SEP)) return false;
+            da_append(p->func, op);
+            Operation deref = {.start = op.start, .type = OP_DEREF};
+            da_append(p->func, deref);
+            Operation one = {.start = op.start, .type = OP_NUM, .op = 1};
+            da_append(p->func, one);
+            da_append(p->func, potential_arithmetics);
+            op.type = OP_ASSIGN;
+            da_append(p->func, op);
+            if (t->t->s == SEP) {
+              if (!next_token(t)) return false;
+              if (!parse_statement(p)) return false;
+            }
+            break;
+          }
+        }
+      } else if (t->t->s == SUB) {
+        potential_arithmetics.type = OP_SUB;
+        if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+          if (peek_next_token(t).s != EQUAL) {
+            if (!expect_special(t, SUB)) return false;
+            if (!expect_special_many(t, END, SEP)) return false;
+            da_append(p->func, op);
+            Operation deref = {.start = op.start, .type = OP_DEREF};
+            da_append(p->func, deref);
+            Operation one = {.start = op.start, .type = OP_NUM, .op = 1};
+            da_append(p->func, one);
+            da_append(p->func, potential_arithmetics);
+            op.type = OP_ASSIGN;
+            da_append(p->func, op);
+            if (t->t->s == SEP) {
+              if (!next_token(t)) return false;
+              if (!parse_statement(p)) return false;
+            }
+            break;
+          }
+        }
+      } else if (t->t->s == AND) {
+        if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+          if (peek_next_token(t).s != EQUAL) {
+            if (!expect_special(t, AND)) return false;
+            potential_arithmetics.type = OP_LOGICAL_AND;
+          }
+        } else potential_arithmetics.type = OP_BITWISE_AND;
+      } else if (t->t->s == OR) {
+        if (peek_next_token(t).t == TOKEN_TYPE_SPECIAL) {
+          if (peek_next_token(t).s != EQUAL) {
+            if (!expect_special(t, OR)) return false;
+            potential_arithmetics.type = OP_LOGICAL_OR;
+          }
+        } else potential_arithmetics.type = OP_BITWISE_OR;
+      } else {
+        if (t->t->s != SEP && t->t->s != EQUAL) {
+          unimpl("in parse statement");
+          return false;
+        }
+      }
+      
+      bool assign_has_op = t->t->s != SEP && t->t->s != EQUAL;
+      if (assign_has_op) {
+        if (!expect_special_many(t, SEP, EQUAL)) return false;
+      } else op.type = OP_ASSIGN;
+      
       if (t->t->s == SEP) {
-        unimpl("SEP in TOKEN_TYPE_RVID");
+        unimpl("SEP in parse statement");
         return false;
       }
+      
       if (t->t->s == EQUAL) {
         if (!next_token(t)) return false;
         if (!parse_expression(p)) return false;
+        if (assign_has_op) {
+          da_append(p->func, op);
+          Operation deref = {.start = op.start, .type = OP_DEREF};
+          da_append(p->func, deref);
+          da_append(p->func, potential_arithmetics);
+          op.type = OP_ASSIGN;
+        }
         da_append(p->func, op);
       }
 
