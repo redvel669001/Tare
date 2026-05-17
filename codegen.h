@@ -19,11 +19,11 @@
 #define LVARS_HEAD "[" LVARS_HEAD_NAME "]"
 
 // TODO: Make tape sizes compile-time and runtime variables.
-#define TAPE_SIZE 1024
-#define ARG_STACK_SIZE 1024
-#define RET_STACK_SIZE 1024
-#define GLOBAL_VAR_STACK_SIZE 1024
-#define LOCAL_VAR_STACK_SIZE 1024
+#define TAPE_SIZE (size_t) 1024
+#define ARG_STACK_SIZE (size_t) 1024
+#define RET_STACK_SIZE (size_t) 1024
+#define GLOBAL_VAR_STACK_SIZE (size_t) 1024
+#define LOCAL_VAR_STACK_SIZE (size_t) 1024
   
 #define TAPE_NAME "tape"
 #define ARGS_NAME "function_arguments_tape"
@@ -47,6 +47,7 @@ typedef struct {
   Operation *op;
   Functions *fns;
   size_t fni; // current function index
+  Vars *globals;
 } Generator;
 
 TARE_DEF bool gen_fasm(Parser *p, const char *output);
@@ -143,9 +144,9 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
 
   Longs longs = {0};
   Longs gotos = {0};
-  Generator gen = {.longs = &longs, .t = t,
+  Generator gen = { .longs = &longs, .t = t,
                    .fn = fns->items, .op = fns->items->items, .fns = fns,
-                   .gotos = &gotos};
+                   .gotos = &gotos, .globals = p->globals, };
 
   // Boilerplate
   fprintf(f, "format ELF64 executable 3\n");
@@ -178,12 +179,12 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   }
   
   fprintf(f, "segment readable writeable\n");
-  fprintf(f, TAPE_NAME " db %d dup (0)\n", TAPE_SIZE);
+  fprintf(f, TAPE_NAME " db %zu dup (0)\n", TAPE_SIZE);
   
-  fprintf(f, ARGS_NAME " db %d dup (0)\n", ARG_STACK_SIZE);
-  fprintf(f, RETS_NAME " db %d dup (0)\n", RET_STACK_SIZE);
-  fprintf(f, GLOBAL_VARS_NAME " db %d dup (0)\n", GLOBAL_VAR_STACK_SIZE);
-  fprintf(f, LOCAL_VARS_NAME " db %d dup (0)\n", LOCAL_VAR_STACK_SIZE);
+  fprintf(f, ARGS_NAME " db %zu dup (0)\n", ARG_STACK_SIZE);
+  fprintf(f, RETS_NAME " db %zu dup (0)\n", RET_STACK_SIZE);
+  fprintf(f, GLOBAL_VARS_NAME " db %zu dup (0)\n", GLOBAL_VAR_STACK_SIZE);
+  fprintf(f, LOCAL_VARS_NAME " db %zu dup (0)\n", LOCAL_VAR_STACK_SIZE);
 
   fprintf(f, TAPE_HEAD_NAME " dq 0\n");
   
@@ -431,15 +432,23 @@ TARE_DEF void gen_address_op(Generator *g, FILE *f) {
 TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
   Function *fn = g->fns->items + fid;
 
-  size_t args_fn = get_args_size_with_padding(fn);
-  size_t rets_fn = get_rets_size_with_padding(fn);
-  size_t lvars_fn = get_lvars_size_with_padding(fn);
+  /* size_t args_fn = get_args_size_with_padding(fn); */
+  /* size_t rets_fn = get_rets_size_with_padding(fn); */
+  /* size_t lvars_fn = get_lvars_size_with_padding(fn); */
+  
+  size_t args_fn = get_args_size(fn);
+  size_t rets_fn = get_rets_size(fn);
+  size_t lvars_fn = get_lvars_size(fn);
   
   Function *fni = g->fns->items + g->fni;
   
-  size_t args_size = get_args_size_with_padding(fni);
-  size_t rets_size = get_rets_size_with_padding(fni);
-  size_t lvars_size = get_lvars_size_with_padding(fni);
+  /* size_t args_size = get_args_size_with_padding(fni); */
+  /* size_t rets_size = get_rets_size_with_padding(fni); */
+  /* size_t lvars_size = get_lvars_size_with_padding(fni); */
+
+  size_t args_size = get_args_size(fni);
+  size_t rets_size = get_rets_size(fni);
+  size_t lvars_size = get_lvars_size(fni);
   
   if (args_size > 0) fprintf(f, "add QWORD " ARGS_HEAD ", %zu\n", args_size);
   if (rets_size > 0) fprintf(f, "add QWORD " RETS_HEAD ", %zu\n", rets_size);
@@ -456,17 +465,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov BYTE [rax], 0\n");
-      fprintf(f, "sub rax, 7\n");
+      /* fprintf(f, "sub rax, 7\n"); */
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov WORD [rax], 0\n");
-      fprintf(f, "sub rax, 6\n");
+      /* fprintf(f, "sub rax, 6\n"); */
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov DWORD [rax], 0\n");
-      fprintf(f, "sub rax, 4\n");
+      /* fprintf(f, "sub rax, 4\n"); */
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
@@ -489,17 +498,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov BYTE [rax], bl\n");
-      fprintf(f, "sub rax, 7\n");
+      /* fprintf(f, "sub rax, 7\n"); */
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov WORD [rax], bx\n");
-      fprintf(f, "sub rax, 6\n");
+      /* fprintf(f, "sub rax, 6\n"); */
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov DWORD [rax], ebx\n");
-      fprintf(f, "sub rax, 4\n");
+      /* fprintf(f, "sub rax, 4\n"); */
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
@@ -528,17 +537,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov bl, BYTE [rax]\n");
-      fprintf(f, "sub rax, 7\n");
+      /* fprintf(f, "sub rax, 7\n"); */
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov bx, WORD [rax]\n");
-      fprintf(f, "sub rax, 6\n");
+      /* fprintf(f, "sub rax, 6\n"); */
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov ebx, DWORD [rax]\n");
-      fprintf(f, "sub rax, 4\n");
+      /* fprintf(f, "sub rax, 4\n"); */
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
@@ -634,7 +643,7 @@ TARE_DEF void gen_index_op(FILE *f) {
 
 // length: TAPE_SIZE
 TARE_DEF void gen_length_op(FILE *f) {
-  fprintf(f, "mov QWORD rax, %d\n", TAPE_SIZE);
+  fprintf(f, "mov QWORD rax, %zu\n", TAPE_SIZE);
   gen_push_to_ops(f);
 }
 
@@ -926,28 +935,36 @@ TARE_DEF void gen_assign_op(FILE *f) {
 TARE_DEF void gen_gvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " GLOBAL_VARS_NAME "\n");
-  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  /* if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8); */
+  size_t offset = get_var_offset(op, g->globals);
+  if (offset != 0) fprintf(f, "add QWORD rax, %zu\n", offset);
   gen_push_to_ops(f);
 }
 
 TARE_DEF void gen_lvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " LVARS_HEAD "\n");
-  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  /* if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8); */
+  size_t offset = get_var_offset(op, &g->fn->lvars);
+  if (offset != 0) fprintf(f, "add QWORD rax, %zu\n", offset);
   gen_push_to_ops(f);
 }
 
 TARE_DEF void gen_rvid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, QWORD " RETS_HEAD "\n");
-  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  /* if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8); */
+  size_t offset = get_var_offset(op, &g->fn->rets);
+  if (offset != 0) fprintf(f, "add QWORD rax, %zu\n", offset);
   gen_push_to_ops(f);
 }
 
 TARE_DEF void gen_avid_op(Generator *g, FILE *f) {
   size_t op = g->op->op;
   fprintf(f, "mov QWORD rax, " ARGS_HEAD "\n");
-  if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8);
+  /* if (op != 0) fprintf(f, "add QWORD rax, %zu\n", op * 8); */
+  size_t offset = get_var_offset(op, &g->fn->args);
+  if (offset != 0) fprintf(f, "add QWORD rax, %zu\n", offset);
   gen_push_to_ops(f);
 }
 

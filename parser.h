@@ -199,6 +199,10 @@ TARE_DEF size_t get_vars_size_with_padding(Vars *vars);
 TARE_DEF size_t get_args_size(Function *fn);
 TARE_DEF size_t get_rets_size(Function *fn);
 TARE_DEF size_t get_lvars_size(Function *fn);
+TARE_DEF size_t get_args_size_with_padding(Function *fn);
+TARE_DEF size_t get_rets_size_with_padding(Function *fn);
+TARE_DEF size_t get_lvars_size_with_padding(Function *fn);
+TARE_DEF size_t get_var_offset(size_t vid, Vars *vars);
 
 TARE_DEF const char *op_type_as_string(OpType type); // For debugging.
 TARE_DEF void print_var(const Var *var, size_t i);
@@ -2061,6 +2065,26 @@ TARE_DEF size_t get_lvars_size_with_padding(Function *fn) {
   return get_vars_size_with_padding(&fn->lvars);
 }
 
+TARE_DEF size_t get_var_offset(size_t vid, Vars *vars) {
+  if (vars == NULL) return -1;
+  if (vid > vars->count) return -1;
+  
+  size_t offset = 0;
+  
+  for (size_t i = 0; i < vid && i < vars->count; i++) {
+    Var var = vars->items[i];
+    switch (var.tid) {
+    case TYPE_U8: offset++; break;
+    case TYPE_U16: offset += 2; break;
+    case TYPE_U32: offset += 4; break;
+    case TYPE_U64: offset += 8; break;
+    case TYPES_COUNT: 
+    default: assert(false && "unimplemented");
+    }
+  }
+  
+  return offset;
+}
 
 TARE_DEF const char *op_type_as_string(OpType type) {
   switch (type) {
