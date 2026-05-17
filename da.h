@@ -12,7 +12,7 @@
 #define TARE_DEF static inline
 
 #ifndef DA_INIT_CAPACITY
-#define DA_INIT_CAPACITY 1024
+#define DA_INIT_CAPACITY 64
 #endif // DA_INIT_CAPACITY
 
 #ifndef da_append
@@ -26,6 +26,7 @@
         (da)->capacity *= 2;                                            \
       }                                                                 \
       (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
+      assert((da)->items != NULL && "allocation failed");               \
     }                                                                   \
     (da)->items[(da)->count++] = (item);                                \
   } while (0)
@@ -41,7 +42,7 @@
         (da)->capacity *= 2;                                            \
       }                                                                 \
       (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
-      assert((da)->items != NULL && "Buy more RAM lol");                \
+      assert((da)->items != NULL && "allocation failed");               \
     }                                                                   \
   } while (0)
 
