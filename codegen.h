@@ -136,6 +136,7 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   FILE *f = fopen(output, "wb");
   if (f == NULL) {
     fprintf(stderr, "error: couldn't open file %s\n", output);
+    return false;
   }
 
   Functions *fns = p->funcs;
