@@ -82,6 +82,7 @@ int main(int argc, char **argv) {
   if (!paths_from_tare(path, &paths, build)) return 1;
 
   bool time_tokenization = false, time_parsing = false, time_codegen = false;
+  bool time_fasm = false;
 
 #ifdef THOROUGH_TIMING
   double tokenization_time_total = 0;
@@ -95,6 +96,10 @@ int main(int argc, char **argv) {
   double codegen_time_total = 0;
   double codegen_time_best = 1;
   double codegen_time_worst = 0;
+
+  double fasm_time_total = 0;
+  double fasm_time_best = 1;
+  double fasm_time_worst = 0;
   
   #define SAMPLE_SIZE 10000
   for (unsigned int counter = 0; counter < SAMPLE_SIZE; counter++) {
@@ -158,24 +163,51 @@ int main(int argc, char **argv) {
     if (time_codegen) print_elapsed_time(start, end, "Codegen");
 #endif // THOROUGH_TIMING
 
-#ifndef THOROUGH_TIMING
+/* #ifndef THOROUGH_TIMING */
     Cmd cmd = {0};
-    int fdout = fileno(stdout);
-    Redirect redirect = {0};
-    close(fdout);
-  
+    /* int fdout = fileno(stdout); */
+    /* Redirect redirect = {0}; */
+    /* close(fdout); */
+
+    FILE *logs = fopen("logs.log", "w");
+    int logs_fd = fileno(logs);
+    Redirect redirect = {.fdout = &logs_fd};
+#ifdef THOROUGH_TIMING
+    bool display = false;
+#else
+    bool display = true;
+#endif // THOROUGH_TIMING
+
+    if (time_fasm) start = get_current_time();
     cmd_append(&cmd, "fasm", paths.fasm_input);
-    if (!run_cmd(&cmd, redirect, true)) return 1;
+    if (!run_cmd(&cmd, redirect, display)) return 1;
+    if (time_fasm) end = get_current_time();
 
+#ifdef THOROUGH_TIMING
+    if (time_fasm) {
+      current_action_time = ((double) end - start) / 1000000000;
+      
+      fasm_time_total += current_action_time;
+      if (current_action_time > fasm_time_worst) fasm_time_worst = current_action_time;
+      if (current_action_time < fasm_time_best) fasm_time_best = current_action_time;
+    }
+#else
+    if (time_fasm) print_elapsed_time(start, end, "Fasm");
+#endif // THOROUGH_TIMING
+
+    redirect.fdout = NULL;
     cmd_append(&cmd, "chmod", "+x", paths.output_bin);
-    if (!run_cmd(&cmd, redirect, true)) return 1;
+    if (!run_cmd(&cmd, redirect, display)) return 1;
 
+/* #endif // THOROUGH_TIMING */
     if (t.l.items) free(t.l.items);
     if (t.items) free(t.items);
+#ifndef THOROUGH_TIMING
     if (cmd.items) free(cmd.items);
     if (flags.items) free(flags.items);
     if (paths.arena.items) free(paths.arena.items);
     if (prog.items) free(prog.items);
+#endif // THOROUGH_TIMING
   
     for (size_t i = 0 ; i < funcs.count; i++) {
       Function fn = funcs.items[i];
@@ -190,12 +222,14 @@ int main(int argc, char **argv) {
     if (funcs.items) free(funcs.items);
 
     if (gotos.items) free(gotos.items);
+#ifndef THOROUGH_TIMING
 #else
   }
 
   double tokenization_time_average = tokenization_time_total / SAMPLE_SIZE;
   double parsing_time_average = parsing_time_total / SAMPLE_SIZE;
   double codegen_time_average = codegen_time_total / SAMPLE_SIZE;
+  double fasm_time_average = fasm_time_total / SAMPLE_SIZE;
 
   printf("Tokenization:\n");
   printf("    Total: %lf\n", tokenization_time_total);
@@ -214,6 +248,12 @@ int main(int argc, char **argv) {
   printf("    Average: %lf\n", codegen_time_average);
   printf("    Best: %lf\n", codegen_time_best);
   printf("    Worst: %lf\n", codegen_time_worst);
+
+  printf("Fasm:\n");
+  printf("    Total: %lf\n", fasm_time_total);
+  printf("    Average: %lf\n", fasm_time_average);
+  printf("    Best: %lf\n", fasm_time_best);
+  printf("    Worst: %lf\n", fasm_time_worst);
   
 #endif // THOROUGH_TIMING
   
