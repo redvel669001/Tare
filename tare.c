@@ -223,6 +223,7 @@ int main(int argc, char **argv) {
     if (funcs.items) free(funcs.items);
 
     if (gotos.items) free(gotos.items);
+    if (globals.items) free(globals.items);
 #ifndef THOROUGH_TIMING
 #else
   }
