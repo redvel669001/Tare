@@ -209,7 +209,7 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
 
   if (gen.longs->items) free(gen.longs->items);
   if (gen.gotos->items) free(gen.gotos->items);
-  
+
   return true;
 }
 
@@ -228,12 +228,9 @@ TARE_DEF bool gen_func(Generator *g, FILE *f) {
   for (size_t i = 0; i < fn->rets.count; i++) {
     Var ret = fn->rets.items[i];
     fprintf(f, "add QWORD rax, %zu\n", offset);
+    if (offset % 8 != 0) fprintf(f, "add QWORD rax, %zu\n", (8 - offset % 8));
     fprintf(f, "mov QWORD [rax], %zu\n", ret.initial);
     switch (ret.tid) {
-    /* case TYPE_U8:  offset++; break; */
-    /* case TYPE_U16: offset += 2; break; */
-    /* case TYPE_U32: offset += 4; break; */
-    /* case TYPE_U64: offset += 8; break; */
     case TYPE_U8:  offset = 1; break;
     case TYPE_U16: offset = 2; break;
     case TYPE_U32: offset = 4; break;
@@ -434,24 +431,16 @@ TARE_DEF void gen_address_op(Generator *g, FILE *f) {
 TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
   Function *fn = g->fns->items + fid;
 
-  size_t args_fn = get_args_size(fn);
-  size_t rets_fn = get_rets_size(fn);
-  size_t lvars_fn = get_lvars_size(fn);
-  
-  if (args_fn % 8 != 0) args_fn += (8 - args_fn % 8);
-  if (rets_fn % 8 != 0) rets_fn += (8 - rets_fn % 8);
-  if (lvars_fn % 8 != 0) lvars_fn += (8 - lvars_fn % 8);
+  size_t args_fn = get_args_size_with_padding(fn);
+  size_t rets_fn = get_rets_size_with_padding(fn);
+  size_t lvars_fn = get_lvars_size_with_padding(fn);
   
   Function *fni = g->fns->items + g->fni;
   
-  size_t args_size = get_args_size(fni);
-  size_t rets_size = get_rets_size(fni);
-  size_t lvars_size = get_lvars_size(fni);
+  size_t args_size = get_args_size_with_padding(fni);
+  size_t rets_size = get_rets_size_with_padding(fni);
+  size_t lvars_size = get_lvars_size_with_padding(fni);
   
-  if (args_size % 8 != 0) args_size += (8 - args_size % 8);
-  if (rets_size % 8 != 0) rets_size += (8 - rets_size % 8);
-  if (lvars_size % 8 != 0) lvars_size += (8 - lvars_size % 8);
-
   if (args_size > 0) fprintf(f, "add QWORD " ARGS_HEAD ", %zu\n", args_size);
   if (rets_size > 0) fprintf(f, "add QWORD " RETS_HEAD ", %zu\n", rets_size);
   if (lvars_size > 0) fprintf(f, "add QWORD " LVARS_HEAD ", %zu\n", lvars_size);
@@ -467,14 +456,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov BYTE [rax], 0\n");
+      fprintf(f, "sub rax, 7\n");
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov WORD [rax], 0\n");
+      fprintf(f, "sub rax, 6\n");
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov DWORD [rax], 0\n");
+      fprintf(f, "sub rax, 4\n");
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
@@ -497,14 +489,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov BYTE [rax], bl\n");
+      fprintf(f, "sub rax, 7\n");
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov WORD [rax], bx\n");
+      fprintf(f, "sub rax, 6\n");
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov DWORD [rax], ebx\n");
+      fprintf(f, "sub rax, 4\n");
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
@@ -533,14 +528,17 @@ TARE_DEF void gen_funcall(Generator *g, FILE *f, size_t fid) {
     case TYPE_U8:
       fprintf(f, "sub rax, 1\n");
       fprintf(f, "mov bl, BYTE [rax]\n");
+      fprintf(f, "sub rax, 7\n");
       break;
     case TYPE_U16:
       fprintf(f, "sub rax, 2\n");
       fprintf(f, "mov bx, WORD [rax]\n");
+      fprintf(f, "sub rax, 6\n");
       break;
     case TYPE_U32:
       fprintf(f, "sub rax, 4\n");
       fprintf(f, "mov ebx, DWORD [rax]\n");
+      fprintf(f, "sub rax, 4\n");
       break;
     case TYPE_U64:
       fprintf(f, "sub rax, 8\n");
