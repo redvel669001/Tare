@@ -1,0 +1,286 @@
+func main: {
+  // a(10);
+  // n();
+  // print_num(fib(4));
+  // print_fibs(0, 42);
+  // print_fibs2(0, 93);
+  print_fibs3(0, 93);
+  // fib(40);
+  ret;
+}
+
+// func print_fibs_with_cache(u64 first, u64 last, u64 fib1, u64 fib2, u64 buf): {
+//   ret;
+// }
+
+// func fib_with_cache(u64 fib1, u64 fib2, u64 buf, u64 ind) => (u64 result): {
+//   r8
+//   b(index);
+//   r64
+//   while (head <= base + 1016): n();
+//   while (head > base + 1016): {
+//     while tape: s(tape);
+//     p();
+//   }
+
+//   // skip ind == 0 cause the tape should be clean
+
+//   n();
+//   a(1);
+  
+
+  
+//   if (ind == 0): {
+//     result = 0;
+//     ret;
+//   }
+
+//   if (ind == 1): {
+//     result = 1;
+//     ret;
+//   }
+
+  
+//   // result = fib(ind - 2) + fib(ind - 1);
+  
+//   r64
+  
+//   // result = fib_with_cache
+//   ret;
+// }
+
+func print_fibs2(u64 first, u64 last): {
+  a(10);
+  write(base, 1);
+  if tape: s(tape);
+    
+  while (first < last): {
+    // clean
+    f(300);
+    while (head + 8 > base + length): p();
+    while (head > base): {
+      if (tape): s(tape);
+      p();
+    }
+    
+    
+    // print
+    // r8
+    print_num(fib_2(0, 0, 0, first));
+    // r64
+    // inc
+    first = first + 1;
+  }
+  ret;
+}
+
+func fib_2(u64 fib1, u64 fib2, u64 buf, u64 ind) => (u64 result): {
+  result = 0;
+
+  fib1 = 0;
+  fib2 = 1;
+
+  if (ind == 0): {
+    result = fib1;
+    ret;
+  }
+
+  if (ind == 1): {
+    result = fib2;
+    ret;
+  }
+
+  while (1): {
+    buf = fib1 + fib2;
+    fib1 = fib2;
+    fib2 = buf;
+    result = result + 1;
+    if (result >= ind): break;
+  }
+
+  result = buf;
+  
+  ret;
+}
+
+func print_fibs3(u64 first, u64 last): {
+  a(10);
+  write(base, 1);
+  if tape: s(tape);
+      
+  while (first < last): {
+    // clean
+    f(300);
+    while (head + 8 > base + length): p();
+    while (head > base): {
+      if (tape): s(tape);
+      p();
+    }
+    
+    
+    // print
+    // r8
+    print_num(fib_3(first));
+    // r64
+    // inc
+    first = first + 1;
+  }
+  ret;
+}
+
+func fib_3(u64 ind) => (u64 result): {
+  result = 0;
+
+  u64 fib1;
+  u64 fib2 = 1;
+
+  // fib1 = 0;
+  // fib2 = 1;
+
+  if (ind == 0): {
+    result = fib1;
+    ret;
+  }
+
+  if (ind == 1): {
+    result = fib2;
+    ret;
+  }
+
+  u64 counter = 0;
+  // counter = 0;
+
+  while (counter < ind): {
+    result = fib1 + fib2;
+    fib1 = fib2;
+    fib2 = result;
+    counter = counter + 1;
+  }
+
+  // result = buf;
+  
+  ret;
+}
+
+func print_fibs(u64 first, u64 last): {
+  a(10);
+  write(base, 1);
+  if tape: s(tape);
+    
+  while (first < last): {
+    // clean
+    f(200);
+    while (head + 8 > base + length): p();
+    while (head > base): {
+      if (tape): s(tape);
+      p();
+    }
+    
+    
+    // print
+    r8
+    print_num(fib(first));
+    r64
+    // inc
+    first = first + 1;
+  }
+
+  // while (first <= last): {
+  //   print_fib(first);
+  //   first = first + 1;
+  // }
+  
+  ret;
+}
+
+// func clean_tape: {
+//   r8
+//   b(index);
+//   while (1): {
+//     while (tape): s(tape);
+//     r64
+//     if (head >= base + 1023): break;
+//     r8
+//     n();
+//   }
+//   b(index);
+//   ret;
+// }
+
+func print_fib(u64 ind): {
+  f(60);
+  // r8
+  while (1): {
+    if (tape): s(tape);
+    if (head <= base): break;
+    p();
+  }
+
+  // clean_tape();
+  // r64
+  
+  // add a newline
+  // while tape: s(tape);
+  // a(10);
+  // write(base, 1);
+  // while tape: s(tape);
+  
+  // clean_tape();
+  
+  // print
+  print_num(fib(ind));
+
+  // f(30);
+  // while (head > base + 8): {
+  //   while (tape): s(tape);
+  //   p();
+  // }
+
+  ret;
+}
+
+func fib(u64 ind) => (u64 result): {
+  if (ind == 0 || ind == 1): {
+    result = 1;
+    ret;
+  }
+
+  result = fib(ind - 2) + fib(ind - 1);
+  
+  ret;
+}
+
+func print_num(u64 arg): {
+  // r8
+  f(20);
+  
+  // // while (tape): s(tape);
+  // a((arg % 10) + 48);
+  // arg = (arg - (arg % 10)) / 10;
+  // // arg = arg / 10;
+  // p();
+
+  while (1): {
+    // r64
+    r8
+    // while (tape): s(tape);
+    a((arg % 10) + 48);
+    // r64
+    arg = (arg - (arg % 10)) / 10;
+    // arg = arg / 10;
+    if (arg == 0): break;
+    // r8
+    p();
+  }
+  
+  // r8
+  // while (head > base): p();
+  f(20);
+  n();
+  // while (tape): s(tape);
+  a(10);
+  n();
+
+  write(base, index);
+  ret;
+}

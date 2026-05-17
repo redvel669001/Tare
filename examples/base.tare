@@ -1,4 +1,6 @@
 func main: {
-  f(base);
+  a(base);
+  n();
+  write(base, index);
   ret;
 }

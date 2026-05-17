@@ -1,0 +1,61 @@
+func main: {
+  a(10);
+  n();
+
+  // print_num(2134567891234567891);
+  if !print_num(2134567891234567891): exit(1);
+  // if print_num(2134567891234567891) == 0: exit(1);
+  
+  if !print_num(0): exit(1);
+
+  while (head != base): {
+    if (tape): s(tape);
+    p();
+  }
+  
+  // b(index);
+  a(10);
+  n();
+  print_num(2357924681);
+
+  // exit(1, 2);
+  // exit2(1);
+  
+  ret;
+}
+
+func exit2: {
+  syscall(60, 0);
+  ret;
+}
+
+func exit(u64 exit_code): {
+  syscall(60, exit_code);
+  ret;
+}
+
+func print_num(u64 arg) => (u64 success): {
+  // r8
+  f(20);
+  success = 1;
+  
+  if (tape): s(tape);
+  a((arg % 10) + 48);
+  arg = (arg - (arg % 10)) / 10;
+  p();
+
+  while (arg > 0): {
+    if (tape): s(tape);
+    a((arg % 10) + 48);
+    arg = (arg - (arg % 10)) / 10;
+    p();
+  }
+  
+  f(20);
+  if (tape): s(tape);
+  a(10);
+  n();
+
+  write(base, index);
+  ret;
+}

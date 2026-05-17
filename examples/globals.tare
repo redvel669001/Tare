@@ -1,0 +1,42 @@
+u8 first = 10;
+u8 second = 69;
+u8 third = 10;
+u8 fourth = 70;
+u8 fifth = 10;
+u8 success = 0;
+
+func main => (u64 exit_code): {
+  r8
+  a(first);
+  n();
+  a(second);
+  n();
+  a(third);
+  n();
+  a(fourth);
+  n();
+  a(fifth);
+  n();
+  write(base, index);
+  while (head > base): {
+    while tape: s(tape);
+    p();
+  }
+  while tape: s(tape);
+  
+  a(test(34, 35));
+  // a(add(34, 35));
+  n();
+  a(test(5, 5));
+  // a(add(5, 5));
+  n();
+  write(base, index);
+  
+  exit_code = success;
+  ret;
+}
+
+func test(u8 one, u8 two) => (u8 three): {
+  three = one + two;
+  ret;
+}
