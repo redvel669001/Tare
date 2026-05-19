@@ -650,12 +650,14 @@ TARE_DEF bool parse_statement(Parser *p) {
       }
       
       if (t->t->s == EQUAL) {
-        if (!next_token(t)) return false;
-        if (!parse_expression(p)) return false;
         if (assign_has_op) {
           da_append(p->func, op);
           Operation deref = {.start = op.start, .type = OP_DEREF};
           da_append(p->func, deref);
+        }
+        if (!next_token(t)) return false;
+        if (!parse_expression(p)) return false;
+        if (assign_has_op) {
           da_append(p->func, potential_arithmetics);
           op.type = OP_ASSIGN;
         }
