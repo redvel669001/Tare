@@ -150,7 +150,7 @@ func fib_3(u64 ind) => (u64 result): {
     ret;
   }
 
-  u64 counter = 0;
+  u64 counter = 1;
   // counter = 0;
 
   while (counter < ind): {
