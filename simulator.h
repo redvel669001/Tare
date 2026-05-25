@@ -1,10 +1,8 @@
 #ifndef SIMULATOR_H_
 #define SIMULATOR_H_
 
-// NOTE: the simulator is currently deprecated!
-
 typedef union {
-  char *u8;
+  unsigned char *u8;
   unsigned short *u16;
   unsigned int *u32;
   size_t *u64;
@@ -12,399 +10,571 @@ typedef union {
 
 typedef struct {
   char *items;
-  size_t count;
   size_t capacity;
-  size_t index;
+  size_t base;
+  size_t head;
   TapeElement value;
 } Tape;
 
 typedef struct {
-  Token *args;
-  size_t args_count;
-  size_t start;
-  size_t end;
-} SimFunc;
+  ScopeType type;
+  size_t vid;
+} Vid;
 
 typedef struct {
-  SimFunc *items;
+  Vid *items;
   size_t count;
   size_t capacity;
-} SimFuncs;
+} Vids;
 
 typedef struct {
   Tape *tape;
   bool fail;
   size_t r; // current read size in bytes
-  Tokenizer *t;
-  String errors;
-  Longs error_indices;
-  SimFuncs fns;
+  Parser *p;
+  Tape *args;
+  Tape *rets;
+  Tape *globals;
+  Tape *locals;
+  Function *fn;
+  Operation *op;
+  Functions *fns;
+  size_t fni; // current function index
+  size_t opi; // current operation index
+  Vars *global_vars;
+  Longs *stack;
+  Longs ret_addrs;
+  Longs addrs;
+  Vids *vids;
 } Simulator;
 
-TARE_DEF bool sim_tare(Tokenizer *t);
-TARE_DEF TapeElement read_from_tape(Tape *tape, size_t r);
-TARE_DEF size_t check_for_warning(const Simulator *sim, size_t op);
+TARE_DEF int sim_tare(Parser *p);
 
-TARE_DEF bool patch_tokenizer_sim_funcs(Tokenizer *t, Simulator *sim);
+TARE_DEF bool sim_func(Simulator *sim);
+TARE_DEF bool sim_op(Simulator *sim);
 
-TARE_DEF size_t calculate_tape(const Simulator *sim, const Tape *tape);
-TARE_DEF size_t calculate_head(const Simulator *sim, const Tape *tape);
-TARE_DEF size_t calculate_base(const Simulator *sim, const Tape *tape);
+TARE_DEF bool sim_funcall(Simulator *sim, size_t fid);
 
+TARE_DEF void read_from_tape(Simulator *sim);
+TARE_DEF void write_to_tape(Simulator *sim, size_t value);
+TARE_DEF size_t value_from_element(Simulator *sim);
+
+TARE_DEF void init_tape(Tape *tape, size_t tape_size);
+
+#define STACK_SIZE 1024*1024*8
 
 #endif // SIMULATOR_H_
 
 #ifdef SIMULATOR_IMPLEMENTATION
 
-TARE_DEF bool sim_tare(Tokenizer *t) {
-  if (t == NULL) return false;
-  
-  first_token(t);
-  if (!patch_tokenizer_jmp(t)) return false;
+TARE_DEF int sim_tare(Parser *p) {
+  if (p == NULL) return -1;
 
   Tape tape = {0};
-  Simulator sim = {.t = t, .tape = &tape};
-  TapeElement value = {0};
-  SimFunc main_func = {0};
-  da_append(&sim.fns, main_func);
-  char tape_fixed[1024*1024] = {0};
-  tape.items = tape_fixed;
-  size_t op = 0;
-  Longs ret_stack = {0};
-  if (!patch_tokenizer_sim_funcs(t, &sim)) return false;
+  init_tape(&tape, TAPE_SIZE);
+  Tape args = {0};
+  init_tape(&args, ARG_STACK_SIZE);
+  Tape rets = {0};
+  init_tape(&rets, RET_STACK_SIZE);
+  Tape globals = {0};
+  init_tape(&globals, GLOBAL_VAR_STACK_SIZE);
+  Tape locals = {0};
+  init_tape(&locals, LOCAL_VAR_STACK_SIZE);
+  Longs stack = {0};
+  Vids vids = {0};
+  
+  Simulator sim = { .tape = &tape, .r = 8, .p = p,
+                    .args = &args, .rets = &rets,
+                    .globals = &globals, .locals = &locals,
+                    .stack = &stack, .global_vars = p->globals,
+                    .vids = &vids, .fns = p->funcs, };
 
-  while (!sim.fail) {
-    check_failure(t, &sim.errors, &sim.error_indices, sim.r, &sim.fail);
-    if (sim.fail) return false;
-    value = read_from_tape(sim.tape, sim.r);
-    switch (t->t->t) {
-    case TOKEN_TYPE_NAME: unimpl("TOKEN_TYPE_NAME"); break;
-    case TOKEN_TYPE_WHOLE_NUM: unimpl("TOKEN_TYPE_WHOLE_NUM"); break;
-    case TOKEN_TYPE_FRAC_NUM: unimpl("TOKEN_TYPE_FRAC_NUM"); break;
-    case TOKEN_TYPE_KEYWORD:
-      switch (t->t->k) {
-      case KEY_F:
-        if (!expect_num_or_tape(t)) return false;
-        op = check_for_warning(&sim, t->t->u64);
-        if (t->t->k == KEY_TAPE) op = calculate_tape(&sim, &tape);
-        else if (t->t->k == KEY_HEAD) op = calculate_head(&sim, &tape);
-        else if (t->t->k == KEY_BASE) op = calculate_base(&sim, &tape);
-        else if (t->t->k == KEY_INDEX) op = tape.index;
-        if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM) op *= sim.r;
-        tape.index += op;
-        if (tape.index >= 1024*1024) {
-          print_loc(stderr, t, t->t);
-          fprintf(stderr, "error: Stack Overflow!\n");
-          return false;
-        }
-        break;
-      case KEY_B:
-        if (!expect_num_or_tape(t)) return false;
-        op = check_for_warning(&sim, t->t->u64);
-        if (t->t->k == KEY_TAPE) op = calculate_tape(&sim, &tape);
-        else if (t->t->k == KEY_HEAD) op = calculate_head(&sim, &tape);
-        else if (t->t->k == KEY_BASE) op = calculate_base(&sim, &tape);
-        else if (t->t->k == KEY_INDEX) op = tape.index;
-        if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM) op *= sim.r;
-        if (tape.index >= op) tape.index -= op;
-        else {
-          print_loc(stderr, t, t->t);
-          fprintf(stderr, "error: Stack Underflow!\n");
-          return false;
-        }
-        break;
-      case KEY_N: tape.index += sim.r; break;
-      case KEY_P: if (tape.index >= sim.r) tape.index -= sim.r; break;
-      case KEY_A:
-        if (!expect_num_or_tape(t)) return false;
-        op = check_for_warning(&sim, t->t->u64);
-        if (t->t->k == KEY_TAPE) op = calculate_tape(&sim, &tape);
-        else if (t->t->k == KEY_HEAD) op = calculate_head(&sim, &tape);
-        else if (t->t->k == KEY_BASE) op = calculate_base(&sim, &tape);
-        else if (t->t->k == KEY_INDEX) op = tape.index;
-        if (sim.r == 1) *value.u8 += op;
-        else if (sim.r == 2) *(unsigned short*)value.u16 += op;
-        else if (sim.r == 4) *(unsigned int*)value.u32 += op;
-        else if (sim.r == 8) *(size_t*)value.u64 += op;
-        break;
-      case KEY_S:
-        if (!expect_num_or_tape(t)) return false;
-        op = check_for_warning(&sim, t->t->u64);
-        if (t->t->k == KEY_TAPE) op = calculate_tape(&sim, &tape);
-        else if (t->t->k == KEY_HEAD) op = calculate_head(&sim, &tape);
-        else if (t->t->k == KEY_BASE) op = calculate_base(&sim, &tape);
-        else if (t->t->k == KEY_INDEX) op = tape.index;
-        if (sim.r == 1) *value.u8 -= op;
-        else if (sim.r == 2) *(unsigned short*)value.u16 -= op;
-        else if (sim.r == 4) *(unsigned int*)value.u32 -= op;
-        else if (sim.r == 8) *(size_t*)value.u64 -= op;
-        break;
-      case KEY_I:
-        if (sim.r == 1) (*value.u8)++;
-        else if (sim.r == 2) (*(unsigned short*)value.u16)++;
-        else if (sim.r == 4) (*(unsigned int*)value.u32)++;
-        else if (sim.r == 8) (*(size_t*)value.u64)++;
-        break;
-      case KEY_D:
-        if (sim.r == 1) (*value.u8)--;
-        else if (sim.r == 2) (*(unsigned short*)value.u16)--;
-        else if (sim.r == 4) (*(unsigned int*)value.u32)--;
-        else if (sim.r == 8) (*(size_t*)value.u64)--;
-        break;
-      case KEY_R8: sim.r = 1; break;
-      case KEY_R16: sim.r = 2; break;
-      case KEY_R32: sim.r = 4; break;
-      case KEY_R64: sim.r = 8; break;
-      case KEY_IF:
-        if (sim.r == 1) op = *value.u8;
-        else if (sim.r == 2) op = *(unsigned short*)value.u16;
-        else if (sim.r == 4) op = *(unsigned int*)value.u32;
-        else if (sim.r == 8) op = *(size_t*)value.u64;
-        if (!op) t->index = t->t->jmp;
-        break;
-      case KEY_WHILE:
-        if (sim.r == 1) op = *value.u8;
-        else if (sim.r == 2) op = *(unsigned short*)value.u16;
-        else if (sim.r == 4) op = *(unsigned int*)value.u32;
-        else if (sim.r == 8) op = *(size_t*)value.u64;
-        if (op) break;
-        t->index = t->t->jmp;
-        continue;
-        break;
-      case KEY_END:
-        {
-          Token *cond = t->items + t->t->jmp;
-          if (cond->k == KEY_IF) break;
-        
-          if (sim.r == 1) op = *value.u8;
-          else if (sim.r == 2) op = *(unsigned short*)value.u16;
-          else if (sim.r == 4) op = *(unsigned int*)value.u32;
-          else if (sim.r == 8) op = *(size_t*)value.u64;
-          if (op) t->index = t->t->jmp;
-        }
-        break;
-      case KEY_FUNC:
-        {
-        if (!expect_fid(t)) return false;
-        SimFunc fn = sim.fns.items[t->t->fid];
-        size_t end = fn.end;
-        if (!to_token(t, end)) return false;
-        }
-        break;
-      /* case KEY_START: break; */
-      case KEY_RET: t->index = ret_stack.items[--ret_stack.count]; break;
-      case KEY_SYSCALL: unimpl("KEY_SYSCALL"); break;
-      case KEY_WRITE:
-        {
-          if (!expect_num_or_tape(t)) return false;
-          size_t arg1 = t->t->u64;
-          if (t->t->k == KEY_TAPE) arg1 = calculate_tape(&sim, &tape);
-          else if (t->t->k == KEY_HEAD) arg1 = calculate_head(&sim, &tape);
-          else if (t->t->k == KEY_BASE) arg1 = calculate_base(&sim, &tape);
-          else if (t->t->k == KEY_INDEX) arg1 = tape.index;
-          /* if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM) */
-          /*   arg1 *= sim.r; */
-          
-          if (!expect_num_or_tape(t)) return false;
-          size_t arg2 = t->t->u64;
-          if (t->t->k == KEY_TAPE) arg2 = calculate_tape(&sim, &tape);
-          else if (t->t->k == KEY_HEAD) arg2 = calculate_head(&sim, &tape);
-          else if (t->t->k == KEY_BASE) arg2 = calculate_base(&sim, &tape);
-          else if (t->t->k == KEY_INDEX) arg2 = tape.index;
-          if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM)
-            arg2 *= sim.r;
+  da_append(&sim.ret_addrs, -1);
 
-          size_t w = write(1, (char *)arg1, arg2);
-          if (w != arg2) fprintf(stderr, "Error?\n");
-        }
-        break;
-      case KEY_READ:
-        {
-          if (!expect_num_or_tape(t)) return false;
-          size_t arg1 = t->t->u64;
-          if (t->t->k == KEY_TAPE) arg1 = calculate_tape(&sim, &tape);
-          else if (t->t->k == KEY_HEAD) arg1 = calculate_head(&sim, &tape);
-          else if (t->t->k == KEY_BASE) arg1 = calculate_base(&sim, &tape);
-          else if (t->t->k == KEY_INDEX) arg1 = tape.index;
-          /* if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM) */
-          /*   arg1 *= sim.r; */
-          
-          if (!expect_num_or_tape(t)) return false;
-          size_t arg2 = t->t->u64;
-          if (t->t->k == KEY_TAPE) arg2 = calculate_tape(&sim, &tape);
-          else if (t->t->k == KEY_HEAD) arg2 = calculate_head(&sim, &tape);
-          else if (t->t->k == KEY_BASE) arg2 = calculate_base(&sim, &tape);
-          else if (t->t->k == KEY_INDEX) arg2 = tape.index;
-          if (t->t->k == KEY_TAPE || t->t->t == TOKEN_TYPE_WHOLE_NUM)
-            arg2 *= sim.r;
-          
-          size_t r = read(0, (char *)arg1, arg2);
-          if (r != arg2) fprintf(stderr, "Error?\n");
-        }
-        break;
-      case KEY_TAPE: unimpl("KEY_TAPE"); break;
-      case KEY_HEAD: unimpl("KEY_HEAD"); break;
-      case KEY_BASE: unimpl("KEY_BASE"); break;
-      case KEY_INDEX: unimpl("KEY_INDEX"); break;
-      case KEY_CONST: unimpl("KEY_CONST"); break;
-      case KEYWORD_TYPES: unimpl("KEYWORD_TYPES"); break;
-      default: unimpl("fuck you too\n"); break;
-      }
-      break;
-    case TOKEN_TYPE_SPECIAL: unimpl("TOKEN_TYPE_SPECIAL"); break;
-    case TOKEN_TYPE_STRING: unimpl("TOKEN_TYPE_STRING"); break;
-    case TOKEN_TYPE_CHAR: unimpl("TOKEN_TYPE_CHAR"); break;
-    case TOKEN_TYPE_VID: unimpl("TOKEN_TYPE_VID"); break;
-    case TOKEN_TYPE_TID: unimpl("TOKEN_TYPE_TID"); break;
-    case TOKEN_TYPE_FID:
-      {
-        SimFunc fn = sim.fns.items[t->t->fid];
-        bool stack_empty = ret_stack.count == 0;
-        size_t last_ret = 0;
-        if (!stack_empty) last_ret = ret_stack.items[ret_stack.count - 1];
-        size_t ret = t->index;
-        if (stack_empty || ret != last_ret) da_append(&ret_stack, ret);
-        t->index = fn.start;
-      }
-      break;
-    case TOKEN_TYPES: unimpl("TOKEN_TYPES"); break;
-    }
+  
+  if (!sim_funcall(&sim, 0)) return -1;
+  
+  int ret = 0;
 
-    if (!next_token(t)) break;
+  if (sim.fni != 0) return -1;
+  if (stack.count > 0) {
+    ret = (int) stack.items[--stack.count];
   }
+  putchar(10);
 
-  return !sim.fail;
+  if (stack.count == 0) return ret;
+
+  for (size_t i = 0; i < stack.count; i++) {
+    size_t num = stack.items[i];
+    printf("stack[%zu] = %zu\n", i, num);
+  }
+  
+  return -1;
 }
 
-TARE_DEF TapeElement read_from_tape(Tape *tape, size_t r) {
+TARE_DEF bool sim_func(Simulator *sim) {
+  Function *fn = sim->fns->items + sim->fni;
+
+  sim->opi = 0;
+
+  while (sim->opi < fn->count) {
+    Operation *op = fn->items + sim->opi;
+    sim->op = op;
+    if (!sim_op(sim)) return false;
+    if (op->type == OP_RET) break;
+    sim->opi++;
+  }
+
+  return true;
+}
+
+TARE_DEF bool sim_op(Simulator *sim) {
+  Parser *p = sim->p;
+  Operation *op = sim->op;
+
+  Tokenizer *t = p->t;
+  t->t = op->start;
+
+  read_from_tape(sim);
+  size_t value = value_from_element(sim);
+
+  Tape *tape = sim->tape;
+
+  Longs *stack = sim->stack;
+  Longs *addrs = &sim->addrs;
+  
+  switch (op->type) {
+  case OP_PTR_ADD:
+  case OP_PTR_SUB:
+    {
+      if (stack->count < 1) return false;
+      size_t first = stack->items[--stack->count];
+      if (op->type == OP_PTR_ADD) tape->head += (first * sim->r);
+      else if (op->type == OP_PTR_SUB) tape->head -= (first * sim->r);
+      else assert(false && "unreachable");
+    }
+    break;
+  case OP_ELEM_ADD:
+  case OP_ELEM_SUB:
+    {
+      if (stack->count < 1) return false;
+      size_t first = stack->items[--stack->count];
+      if (op->type == OP_ELEM_ADD) write_to_tape(sim, value + first);
+      else if (op->type == OP_ELEM_SUB) write_to_tape(sim, value - first);
+      else assert(false && "unreachable");
+    }
+    break;
+  case OP_READ_SIZE: sim->r = op->op; break;
+  case OP_CONDITIONAL:
+    {
+      if (stack->count < 1) return false;
+      size_t first = stack->items[--stack->count];
+      if (first == 0) sim->opi = op->op;
+    }
+    break;
+  case OP_GOTO: sim->opi = op->op; break;
+  case OP_ADDRESS: break;
+    da_append(addrs, op->op); break;
+  case OP_FUNCALL:
+    if (!sim_funcall(sim, op->op)) return false;
+    break;
+  case OP_RET:
+    if (sim->ret_addrs.count < 1) return false;
+    sim->fni = sim->ret_addrs.items[--sim->ret_addrs.count];
+    break;
+  case OP_WRITE:
+  case OP_READ:
+    {
+      if (stack->count < 2) return false;
+      size_t second = stack->items[--stack->count] * sim->r;
+      char *first = (char *) (stack->items[--stack->count]);
+      if (second > tape->capacity) second = tape->capacity;
+      size_t result = 0;
+      if (op->type == OP_WRITE) result = write(STDOUT_FILENO, first, second);
+      else if (op->type == OP_READ) result = read(STDIN_FILENO, first, second);
+      else assert(false && "uncreachable");
+      result = second;
+      if (result != second) return false;
+    }
+    break;
+  case OP_SYSCALL:
+    {
+      size_t args[7] = {0};
+      size_t pops = op->op;
+      while (pops--) {
+        if (stack->count < 1) return false;
+        args[pops] = stack->items[--stack->count];
+      }
+      long result = 0;
+      if (op->op == 1) {
+        result = syscall(args[0]);
+      } else if (op->op == 2) {
+        result = syscall(args[0], args[1]);
+      } else if (op->op == 3) {
+        result = syscall(args[0], args[1], args[2]);
+      } else if (op->op == 4) {
+        result = syscall(args[0], args[1], args[2], args[3]);
+      } else if (op->op == 5) {
+        result = syscall(args[0], args[1], args[2], args[3], args[4]);
+      } else if (op->op == 6) {
+        result = syscall(args[0], args[1], args[2], args[3], args[4], args[5]);
+      } else if (op->op == 7) {
+        result = syscall(args[0], args[1], args[2], args[3], args[4],
+                         args[5], args[6]);
+      }
+      if (result == ENOSYS) {
+        diag_errf(t, t->t, "syscall number %zu has not been implemented!\n",
+                  args[0]);
+      }
+    }
+    break;
+  
+  case OP_TAPE: da_append(stack, value); break;
+  case OP_HEAD: da_append(stack, tape->head); break;
+  case OP_BASE: da_append(stack, tape->base); break;
+  case OP_INDEX: da_append(stack, tape->head - tape->base); break;
+  case OP_LENGTH: da_append(stack, tape->capacity); break;
+  
+  case OP_CONST: unimpl("OP_CONST"); break;
+
+  case OP_PUSH: case OP_POP:
+    if (stack->count < 1) return false;
+    stack->count--;
+    break;
+
+  case OP_ADD: case OP_SUB:
+  case OP_MUL: case OP_DIV: case OP_MOD:
+  case OP_SHL: case OP_SHR:
+  case OP_LESS: case OP_LESS_EQUAL:
+  case OP_GREATER: case OP_GREATER_EQUAL:
+  case OP_EQUAL: case OP_NOT_EQUAL:
+  case OP_BITWISE_AND: case OP_BITWISE_OR:
+  case OP_LOGICAL_AND: case OP_LOGICAL_OR:
+    {
+      if (stack->count < 2) return false;
+      size_t second = stack->items[--stack->count];
+      size_t first = stack->items[--stack->count];
+
+      size_t val = 0;
+      if (op->type == OP_ADD) val = first + second;
+      else if (op->type == OP_SUB) val = first - second;
+      else if (op->type == OP_MUL) val = first * second;
+      else if (op->type == OP_DIV) val = first / second;
+      else if (op->type == OP_MOD) val = first % second;
+      else if (op->type == OP_SHL) val = first << second;
+      else if (op->type == OP_SHR) val = first >> second;
+      else if (op->type == OP_LESS) val = first < second;
+      else if (op->type ==  OP_LESS_EQUAL) val = first <= second;
+      else if (op->type == OP_GREATER) val = first > second;
+      else if (op->type ==  OP_GREATER_EQUAL) val = first >= second;
+      else if (op->type == OP_EQUAL) val = first == second;
+      else if (op->type ==  OP_NOT_EQUAL) val = first != second;
+      else if (op->type ==  OP_BITWISE_AND) val = first & second;
+      else if (op->type ==  OP_BITWISE_OR) val = first | second;
+      else if (op->type ==  OP_LOGICAL_AND) val = first && second;
+      else if (op->type ==  OP_LOGICAL_OR) val = first || second;
+      else assert(false && "unreachable");
+      
+      da_append(stack, val);
+    }
+    break;
+    
+  case OP_NOT:
+    {
+      if (stack->count < 1) return false;
+      size_t first = stack->items[--stack->count];
+      da_append(stack, !first);
+    }
+    break;
+  
+  case OP_DEREF:
+    {
+      if (stack->count < 1) return false;
+      if (sim->vids->count < 1) return false;
+      size_t first = stack->items[--stack->count];
+      char *item = (char *) first;
+      Vid vid = sim->vids->items[--sim->vids->count];
+      
+      const Var *var = NULL;
+      
+      switch (vid.type) {
+      case SCOPE_GLOBAL: var = sim->global_vars->items + vid.vid; break;
+      case SCOPE_LOCAL: var = sim->fn->lvars.items + vid.vid; break;
+      case SCOPE_ARGUMENT: var = sim->fn->args.items + vid.vid; break;
+      case SCOPE_RETURN: var = sim->fn->rets.items + vid.vid; break;
+      case SCOPE_TYPES: default: assert(false && "unreachable");
+      }
+
+      if (var == NULL) return false;
+
+      size_t val = 0;
+      
+      switch (var->tid) {
+      case TYPE_U8:val = *((unsigned char *) item);break;
+      case TYPE_U16: val = *((unsigned short *) item); break;
+      case TYPE_U32: val = *((unsigned int *) item); break;
+      case TYPE_U64: val = *((size_t *) item); break;
+      case TYPES_COUNT: 
+      default: assert(false && "unimplemented");
+      }
+
+      da_append(stack, val);
+    }
+    break;
+
+  case OP_NUM: da_append(stack, op->op); break;
+
+  case OP_POP_FROM_OPS:
+    if (stack->count < 1) return false;
+    stack->count--;
+    break;
+
+  case OP_GVID:
+  case OP_LVID:
+  case OP_RVID:
+  case OP_AVID:
+    {
+      char *item = NULL;
+      char *head = NULL;
+      size_t offset = 0;
+      
+      Vid vid = { .vid = op->op };
+
+      if (op->type == OP_GVID) {
+        offset = get_var_offset(op->op, sim->global_vars);
+        head = (char *) sim->globals->head;
+        vid.type = SCOPE_GLOBAL;
+      } else if (op->type == OP_LVID) {
+        offset = get_var_offset(op->op, &sim->fn->lvars);
+        head = (char *) sim->locals->head;
+        vid.type = SCOPE_LOCAL;
+      } else if (op->type == OP_RVID) {
+        offset = get_var_offset(op->op, &sim->fn->rets);
+        head = (char *) sim->rets->head;
+        vid.type = SCOPE_RETURN;
+      } else if (op->type == OP_AVID) {
+        offset = get_var_offset(op->op, &sim->fn->args);
+        head = (char *) sim->args->head;
+        vid.type = SCOPE_ARGUMENT;
+      } else assert(false && "unreachable");
+      item = head + offset;
+      da_append(stack, (size_t) item);
+      da_append(sim->vids, vid);
+    }
+    break;
+
+  case OP_ASSIGN:
+    {
+      if (stack->count < 2) return false;
+      if (sim->vids->count < 1) return false;
+      size_t second = stack->items[--stack->count];
+      size_t first = stack->items[--stack->count];
+      char *item = (char *) first;
+      Vid vid = sim->vids->items[--sim->vids->count];
+      
+      const Var *var = NULL;
+      
+      switch (vid.type) {
+      case SCOPE_GLOBAL: var = sim->global_vars->items + vid.vid; break;
+      case SCOPE_LOCAL: var = sim->fn->lvars.items + vid.vid; break;
+      case SCOPE_ARGUMENT: var = sim->fn->args.items + vid.vid; break;
+      case SCOPE_RETURN: var = sim->fn->rets.items + vid.vid; break;
+      case SCOPE_TYPES:
+      default: assert(false && "unreachable");
+      }
+
+      if (var == NULL) return false;
+      
+      switch (var->tid) {
+      case TYPE_U8:
+        *item = (unsigned char) second;
+        break;
+      case TYPE_U16:
+        *((unsigned short *)item) = (unsigned short) second;
+        break;
+      case TYPE_U32:
+        *((unsigned int *)item) = (unsigned int) second;
+        break;
+      case TYPE_U64:
+        *((size_t *)item) = second;
+        break;
+      case TYPES_COUNT: 
+      default: assert(false && "unimplemented");
+      }
+    }
+    break;
+
+  case OP_TYPES: unimpl("OP_TYPES"); break;
+  default: assert(false && "unreachable");
+  }
+
+  return true;
+}
+
+TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
+  Parser *p = sim->p;
+  Longs *stack = sim->stack;
+  size_t save = sim->opi;
+  da_append(&sim->ret_addrs, sim->fni);
+  
+  Function *fn = sim->fns->items + fid;
+  size_t args_fn = get_args_size(fn);
+  size_t rets_fn = get_rets_size(fn);
+  size_t lvars_fn = get_lvars_size(fn);
+
+  Function *fni = sim->fns->items + sim->fni;
+  size_t args_size = get_args_size(fni);
+  size_t rets_size = get_rets_size(fni);
+  size_t lvars_size = get_lvars_size(fni);
+
+  sim->args->head += args_size;
+  sim->rets->head += rets_size;
+  sim->locals->head += lvars_size;
+
+  size_t lvars_head = sim->locals->head;
+
+  lvars_head += lvars_fn;
+  
+  for (size_t i = 0; i < fn->lvars.count; i++) {
+    Var var = fn->lvars.items[i];
+    switch (var.tid) {
+    case TYPE_U8:
+      lvars_head--;
+      *((unsigned char *) lvars_head) = 0;
+      /* lvars_head -= 7; */
+      break;
+    case TYPE_U16:
+      lvars_head -= 2;
+      *((unsigned short *) lvars_head) = 0;
+      /* lvars_head -= 6; */
+      break;
+    case TYPE_U32:
+      lvars_head -= 4;
+      *((unsigned int *) lvars_head) = 0;
+      /* lvars_head -= 4; */
+      break;
+    case TYPE_U64:
+      lvars_head -= 8;
+      *((size_t *) lvars_head) = 0;
+      break;
+    case TYPES_COUNT:
+    default: assert(false && "unimplemented");
+    }
+  }
+  
+  size_t args_head = sim->args->head;
+  
+  args_head += args_fn;
+  
+  for (size_t i = 0; i < fn->args.count; i++) {
+    size_t argument = stack->items[--stack->count];
+    Var arg = fn->args.items[i];
+    switch (arg.tid) {
+    case TYPE_U8:
+      args_head--;
+      *((unsigned char *) args_head) = ((unsigned char) argument);
+      /* args_head -= 7; */
+      break;
+    case TYPE_U16:
+      args_head -= 2;
+      *((unsigned short *) args_head) = ((unsigned short) argument);
+      /* args_head -= 6; */
+      break;
+    case TYPE_U32:
+      args_head -= 4;
+      *((unsigned int *) args_head) = ((unsigned int) argument);
+      /* args_head -= 4; */
+      break;
+    case TYPE_U64:
+      args_head -= 8;
+      *((size_t *) args_head) = ((size_t) argument);
+      break;
+    case TYPES_COUNT:
+    default: assert(false && "unimplemented");
+    }
+  }
+  
+  sim->fni = fid;
+  sim->fn = p->funcs->items + sim->fni;
+  if (!(sim_func(sim))) return false;
+  sim->opi = save;
+
+  size_t rets_head = sim->rets->head;
+  rets_head += rets_fn;
+
+  sim->args->head -= args_size;
+  sim->rets->head -= rets_size;
+  sim->locals->head -= lvars_size;
+  
+  for (size_t i = 0; i < fn->rets.count; i++) {
+    size_t ret_val = 0;
+    Var ret = fn->rets.items[i];
+    switch (ret.tid) {
+    case TYPE_U8:
+      rets_head--;
+      ret_val = *((unsigned char *) rets_head);
+      /* rets_head -= 7; */
+      break;
+    case TYPE_U16:
+      rets_head -= 2;
+      ret_val = *((unsigned short *) rets_head);
+      /* rets_head -= 6; */
+      break;
+    case TYPE_U32:
+      rets_head -= 4;
+      ret_val = *((unsigned int *) rets_head);
+      /* rets_head -= 4; */
+      break;
+    case TYPE_U64:
+      rets_head -= 8;
+      ret_val = *((size_t *) rets_head);
+      break;
+    case TYPES_COUNT: 
+    default: assert(false && "unimplemented");
+    }
+    da_append(stack, ret_val);
+  }
+  
+  return true;
+}
+
+TARE_DEF void read_from_tape(Simulator *sim) {
   TapeElement element = {0};
   
-  if (r == 0) return element;
+  if (sim->r == 1) element.u8 = (unsigned char *) sim->tape->head;
+  else if (sim->r == 2) element.u16 = (unsigned short *) sim->tape->head;
+  else if (sim->r == 4) element.u32 = (unsigned int *) sim->tape->head;
+  else if (sim->r == 8) element.u64 = (size_t *) sim->tape->head;
+  else assert(false && "unreachable");
 
-  char *point = tape->items + tape->index;
+  sim->tape->value = element;
+}
+
+TARE_DEF void write_to_tape(Simulator *sim, size_t value) {
+  TapeElement element = sim->tape->value;
   
-  if (r == 1) element.u8 = point;
-  else if (r == 2) element.u16 = (unsigned short *) point;
-  else if (r == 4) element.u32 = (unsigned int *) point;
-  else if (r == 8) element.u64 = (size_t *) point;
-
-  tape->value = element;
-  
-  return element;
+  if (sim->r == 1) *element.u8 = (unsigned char) value;
+  else if (sim->r == 2) *element.u16 = (unsigned short) value;
+  else if (sim->r == 4) *element.u32 = (unsigned int) value;
+  else if (sim->r == 8) *element.u64 = value;
+  else assert(false && "unreachable");
 }
 
-TARE_DEF size_t check_for_warning(const Simulator *sim, size_t op) {
-  if (sim->r == 1 && op >= R8_MAX) {
-    print_loc(stderr, sim->t, sim->t->t);
-    fprintf(stderr, "WARNING: operand of 8 bits read tries to use"
-            " more than 8 bits in its operand. Please fix this if"
-            " this is an error.\n");
-    op %= R8_MAX;
-  } else if (sim->r == 2 && op >= R16_MAX) {
-    print_loc(stderr, sim->t, sim->t->t);
-    fprintf(stderr, "WARNING: operand of 16 bits read tries to use"
-            " more than 16 bits in its operand. Please fix this if"
-            " this is an error.\n");
-    op %= R16_MAX;
-  } else if (sim->r == 4 && op >= R32_MAX) {
-    print_loc(stderr, sim->t, sim->t->t);
-    fprintf(stderr, "WARNING: operand of 32 bits read tries to use"
-            " more than 32 bits in its operand. Please fix this if"
-            " this is an error.\n");
-    op %= R32_MAX;
-  } else if (sim->r == 8 && op >= R64_MAX) {
-    print_loc(stderr, sim->t, sim->t->t);
-    fprintf(stderr, "WARNING: operand of 64 bits read tries to use"
-            " more than 64 bits in its operand. Please fix this if"
-            " this is an error.\n");
-    op %= R64_MAX;
-  }
+TARE_DEF size_t value_from_element(Simulator *sim) {
+  TapeElement element = sim->tape->value;
 
-  return op;
+  if (sim->r == 1) return (size_t) (*element.u8);
+  else if (sim->r == 2) return (size_t) (*element.u16);
+  else if (sim->r == 4) return (size_t) (*element.u32);
+  else if (sim->r == 8) return (size_t) (*element.u64);
+  else assert(false && "unreachable");
 }
 
-TARE_DEF bool patch_tokenizer_sim_funcs(Tokenizer *t, Simulator *sim) {
-  size_t point = t->index;
-  
-  first_token(t);
-  while (true) {
-    if (t->t->t != TOKEN_TYPE_KEYWORD) {
-      if (!next_token(t)) break;
-      continue;
-    }
-    if (t->t->k != KEY_FUNC) {
-      if (!next_token(t)) break;
-      continue;
-    }
-    
-    // Get the function's name.
-    if (!expect_name(t)) return false;
-    t->t->t = TOKEN_TYPE_FID;
-    t->t->fid = sim->fns.count;
-    Token *final_token = t->items + t->count;
-    for (Token *tok = t->t; tok < final_token; tok++) {
-      if (tok->t != TOKEN_TYPE_NAME) continue;
-      if (tok_eq(t->t, tok)) {
-        tok->t = TOKEN_TYPE_FID;
-        tok->fid = sim->fns.count;
-      }
-    }
-
-    SimFunc fn = {0};
-
-    // Gather function arguments.
-    /* while (peek_next_token(t).k != KEY_START) { */
-    /*   if (!expect_name_or_start(t)) return false; */
-    /*   if (fn.args != NULL) fn.args = t->t; */
-    /*   fn.args++; */
-    /*   for (Token *tok = t->t; tok < final_token; tok++) { */
-    /*     if (tok->k == KEY_RET) break; */
-    /*     if (tok->t != TOKEN_TYPE_NAME) continue; */
-    /*     if (tok_eq(t->t, tok)) { */
-    /*       tok->t = TOKEN_TYPE_VID; */
-    /*       tok->vid = fn.args_count; */
-    /*     } */
-    /*   } */
-    /* } */
-
-    if (!next_token(t)) return false;
-    fn.start = t->index;
-    while (t->t->k != KEY_RET) if (!next_token(t)) return false;
-    fn.end = t->index;
-    da_append(&sim->fns, fn);
-    if (!next_token(t)) break;
-  }
-
-  return to_token(t, point);
-}
-
-TARE_DEF size_t calculate_tape(const Simulator *sim, const Tape *tape) {
-  size_t op = 0;
-  if (sim->r == 1) op = tape->items[tape->index];
-  else if (sim->r == 2) op = *(unsigned short*)(tape->items + tape->index);
-  else if (sim->r == 4) op = *(unsigned int*)(tape->items + tape->index);
-  else if (sim->r == 8) op = *(size_t*)(tape->items + tape->index);
-  return op;
-}
-
-TARE_DEF size_t calculate_head(const Simulator *sim, const Tape *tape) {
-  size_t head = 0;
-  const char *addr = tape->items + tape->index;
-  if (sim->r == 1) head = (char) (size_t) addr;
-  else if (sim->r == 2) head = (unsigned short) (size_t) addr;
-  else if (sim->r == 4) head = (unsigned int) (size_t) addr;
-  else if (sim->r == 8) head = (size_t) addr;
-  
-  return head;
-}
-
-TARE_DEF size_t calculate_base(const Simulator *sim, const Tape *tape) {
-  size_t base = 0;
-  if (sim->r == 1) base = (char) (size_t) tape->items;
-  else if (sim->r == 2) base = (unsigned short) (size_t) tape->items;
-  else if (sim->r == 4) base = (unsigned int) (size_t) tape->items;
-  else if (sim->r == 8) base = (size_t) tape->items;
-  return base;
+TARE_DEF void init_tape(Tape *tape, size_t tape_size) {
+  tape->items = calloc(tape_size, 1);
+  tape->capacity = tape_size;
+  tape->base = (size_t) tape->items;
+  tape->head = tape->base;
 }
 
 #endif // SIMULATOR_IMPLEMENTATION

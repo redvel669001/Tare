@@ -32,8 +32,8 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 #define FLAGS_IMPLEMENTATION
 #include "flags.h"
 
-/* #define SIMULATOR_IMPLEMENTATION */
-/* #include "simulator.h" */
+#define SIMULATOR_IMPLEMENTATION
+#include "simulator.h"
 
 #include <time.h>
 
@@ -121,13 +121,6 @@ int main(int argc, char **argv) {
 #else
     if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
 #endif // THOROUGH_TIMING
-
-    // Simulator is currently deprecated
-    if (flags.items[FLAG_SIMULATE].on) {
-      fprintf(stderr, "Simulation mode isn't supported\n");
-      /* if (!sim_tare(&t)) return 1; */
-      return 0;
-    }
   
     Functions funcs = {0};
     Longs gotos = {0};
@@ -147,6 +140,11 @@ int main(int argc, char **argv) {
 #else
     if (time_parsing) print_elapsed_time(start, end, "Parsing");
 #endif // THOROUGH_TIMING
+
+    // Simulator is currently deprecated
+    if (flags.items[FLAG_SIMULATE].on) {
+      return sim_tare(&p);
+    }
 
     if (time_codegen) start = get_current_time();
     if (!gen_fasm(&p, paths.output)) return 1;
