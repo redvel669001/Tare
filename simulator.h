@@ -295,28 +295,39 @@ TARE_DEF bool sim_op(Simulator *sim) {
       size_t first = stack->items[--stack->count];
       char *item = (char *) first;
       Vid vid = sim->vids->items[--sim->vids->count];
-      
+
       const Var *var = NULL;
       
       switch (vid.type) {
-      case SCOPE_GLOBAL: var = sim->global_vars->items + vid.vid; break;
-      case SCOPE_LOCAL: var = sim->fn->lvars.items + vid.vid; break;
-      case SCOPE_ARGUMENT: var = sim->fn->args.items + vid.vid; break;
-      case SCOPE_RETURN: var = sim->fn->rets.items + vid.vid; break;
+      case SCOPE_GLOBAL:
+        if (vid.vid >= sim->global_vars->capacity) return false;
+        var = sim->global_vars->items + vid.vid;
+        break;
+      case SCOPE_LOCAL:
+        if (vid.vid >= sim->fn->lvars.capacity) return false;
+        var = sim->fn->lvars.items + vid.vid;
+        break;
+      case SCOPE_ARGUMENT:
+        if (vid.vid >= sim->fn->args.capacity) return false;
+        var = sim->fn->args.items + vid.vid;
+        break;
+      case SCOPE_RETURN:
+        if (vid.vid >= sim->fn->rets.capacity) return false;
+        var = sim->fn->rets.items + vid.vid;
+        break;
       case SCOPE_TYPES: default: assert(false && "unreachable");
       }
 
       if (var == NULL) return false;
 
       size_t val = 0;
-      
+
       switch (var->tid) {
-      case TYPE_U8:val = *((unsigned char *) item);break;
+      case TYPE_U8: val = *((unsigned char *) item); break;
       case TYPE_U16: val = *((unsigned short *) item); break;
       case TYPE_U32: val = *((unsigned int *) item); break;
       case TYPE_U64: val = *((size_t *) item); break;
-      case TYPES_COUNT: 
-      default: assert(false && "unimplemented");
+      case TYPES_COUNT: default: assert(false && "unimplemented");
       }
 
       da_append(stack, val);
@@ -376,12 +387,23 @@ TARE_DEF bool sim_op(Simulator *sim) {
       const Var *var = NULL;
       
       switch (vid.type) {
-      case SCOPE_GLOBAL: var = sim->global_vars->items + vid.vid; break;
-      case SCOPE_LOCAL: var = sim->fn->lvars.items + vid.vid; break;
-      case SCOPE_ARGUMENT: var = sim->fn->args.items + vid.vid; break;
-      case SCOPE_RETURN: var = sim->fn->rets.items + vid.vid; break;
-      case SCOPE_TYPES:
-      default: assert(false && "unreachable");
+      case SCOPE_GLOBAL:
+        if (vid.vid >= sim->global_vars->capacity) return false;
+        var = sim->global_vars->items + vid.vid;
+        break;
+      case SCOPE_LOCAL:
+        if (vid.vid >= sim->fn->lvars.capacity) return false;
+        var = sim->fn->lvars.items + vid.vid;
+        break;
+      case SCOPE_ARGUMENT:
+        if (vid.vid >= sim->fn->args.capacity) return false;
+        var = sim->fn->args.items + vid.vid;
+        break;
+      case SCOPE_RETURN:
+        if (vid.vid >= sim->fn->rets.capacity) return false;
+        var = sim->fn->rets.items + vid.vid;
+        break;
+      case SCOPE_TYPES: default: assert(false && "unreachable");
       }
 
       if (var == NULL) return false;
