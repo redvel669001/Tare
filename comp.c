@@ -5,13 +5,12 @@
 #define CMD_IMPLEMENTATION
 #include "cmd.h"
 
+#define FLAGS_IMPLEMENTATION
+#include "flags.h"
+
 #include <sys/stat.h>
 
-#define CFLAGS_BASIC "-Wextra", "-Wall", "-pedantic"
-
-#define CFLAGS_STRICT "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow"
-
-#define CFLAGS_EXTRA_STRICT "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum"
+#define CFLAGS "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum"
 
 TARE_DEF void verify_flags(void);
 
@@ -22,121 +21,65 @@ TARE_DEF double timespec_to_double(struct timespec tm);
 TARE_DEF double get_stat_time(const struct stat *statbuf);
 
 int main(int argc, char **argv) {
-  bool basic = true;
-  bool strict = false;
-  bool extra_strict = false;
-  bool fast = false;
-  bool werror = false;
-  bool no_werror = false;
-  bool rebuild = false;
-  bool no_rebuild = false;
-  bool rebuild_rest = false;
-  bool no_rebuild_rest = false;
-  bool debug = false;
-  bool no_debug = false;
-  bool profile = false;
-  bool no_profile = false;
-  bool test = false;
-  bool no_test = false;
+  const char *bin_path = *argv;
+  const char *src_path = __FILE__;
+
+  argc--;
+  argv++;
 
   enum {
-    FLAG_BASIC = 0,
-    FLAG_STRICT,
-    FLAG_EXTRA_STRICT,
-    FLAG_FAST,
+    FLAG_FAST = 0,
     FLAG_WERROR,
-    FLAG_NO_WERROR,
     FLAG_REBUILD,
     FLAG_NO_REBUILD,
     FLAG_REBUILD_REST,
-    FLAG_NO_REBUILD_REST,
     FLAG_DEBUG,
-    FLAG_NO_DEBUG,
     FLAG_PROFILE,
-    FLAG_NO_PROFILE,
     FLAG_TEST,
-    FLAG_NO_TEST,
-    
     FLAGS_COUNT,
   };
-  
-  const char *flags_short_names[FLAGS_COUNT] = {
-    "-b", "-s", "-es", "-f",
-    "-we", "-nwe",
-    "-rb", "-nrb",
-    "-rbr", "-nrbr",
-    "-g", "-ng",
-    "-p", "-np",
-    "-t", "-nt",
-  };
-  
-  const char *flags_long_names[FLAGS_COUNT] = {
-    "--basic", "--strict", "--extra-strict", "--fast",
-    "--werror", "--no-werror",
-    "--rebuild", "--no-rebuild",
-    "--rebuild-rest", "--no-rebuild-rest",
-    "--debug", "--no-debug",
-    "--profile", "--no-profile",
-    "--test", "--no-test",
-  };
 
+  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the flags array to match the new count.");
+  Flag fast = { .name_short = "-f", .name_long = "--fast", };
+  Flag werror = { .name_short = "-we", .name_long = "--werror", };
+  Flag rebuild = { .name_short = "-rb", .name_long = "--rebuild", };
+  Flag no_rebuild = { .name_short = "-nrb", .name_long = "--no-rebuild", };
+  Flag rebuild_rest = { .name_short = "-rbr", .name_long = "--rebuild-rest", };
+  Flag debug = { .name_short = "-g", .name_long = "--debug", };
+  Flag profile = { .name_short = "-p", .name_long = "--profile", };
+  Flag test = { .name_short = "-t", .name_long = "--test", };
   
-  bool *flags[FLAGS_COUNT] = {
-    &basic,
-    &strict,
-    &extra_strict,
-    &fast,
-    &werror, &no_werror,
-    &rebuild, &no_rebuild,
-    &rebuild_rest, &no_rebuild_rest,
-    &debug, &no_debug,
-    &profile, &no_profile,
-    &test, &no_test,
+  Flag *flag_array[FLAGS_COUNT] = {
+    [FLAG_FAST] = &fast,
+    [FLAG_WERROR] = &werror,
+    [FLAG_REBUILD] = &rebuild,
+    [FLAG_NO_REBUILD] = &no_rebuild,
+    [FLAG_REBUILD_REST] = &rebuild_rest,
+    [FLAG_DEBUG] = &debug,
+    [FLAG_PROFILE] = &profile,
+    [FLAG_TEST] = &test,
   };
 
   size_t rebuild_index = FLAG_REBUILD;
   size_t no_rebuild_index = FLAG_NO_REBUILD;
-  assert((strcmp(flags_short_names[rebuild_index], "-rb") == 0)
+  assert((strcmp(flag_array[rebuild_index]->name_short, "-rb") == 0)
          && "fix flags");
-  assert((strcmp(flags_short_names[no_rebuild_index], "-nrb") == 0)
+  assert((strcmp(flag_array[no_rebuild_index]->name_short, "-nrb") == 0)
          && "fix flags");
-  assert((strcmp(flags_long_names[rebuild_index], "--rebuild") == 0)
+  assert((strcmp(flag_array[rebuild_index]->name_long, "--rebuild") == 0)
          && "fix flags");
-  assert((strcmp(flags_long_names[no_rebuild_index], "--no-rebuild") == 0)
+  assert((strcmp(flag_array[no_rebuild_index]->name_long, "--no-rebuild") == 0)
          && "fix flags");
-  const char *rebuild_flag_short = flags_short_names[rebuild_index];
-  const char *no_rebuild_flag_short = flags_short_names[no_rebuild_index];
-  const char *rebuild_flag_long = flags_long_names[rebuild_index];
-  const char *no_rebuild_flag_long = flags_long_names[no_rebuild_index];
 
-  // start from 1 to skip program name
-  for (size_t i = 1; i < (size_t) argc; i++) {
-    const char *flag = argv[i];
-    for (size_t j = 0; j < FLAGS_COUNT; j++) {
-      if ((strcmp(flag, flags_short_names[j]) == 0) ||
-          (strcmp(flag, flags_long_names[j]) == 0)) *flags[j] = true;
-    }
-  }
+  Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
+  parse_flags(argc, (const char**) argv, &flags);
 
-  if (extra_strict) {
-    strict = false;
-    basic = false;
-  }
-  
-  if (strict) basic = false;
-
-  if (no_werror) werror = false;
-  if (no_debug) debug = false;
-  if (no_rebuild) rebuild = false;
-  if (no_rebuild_rest) rebuild_rest = false;
-  if (no_profile) profile = false;
+  if (no_rebuild.on) rebuild.on = false;
 
   Cmd cmd = {0};
   Redirect redirect = {0};
 
-  const char *bin_path = *argv;
-  const char *src_path = __FILE__;
-  if ((needs_rebuild(bin_path, src_path) || rebuild) && !no_rebuild) {
+  if ((needs_rebuild(bin_path, src_path) || rebuild.on) && !no_rebuild.on) {
     // Is this really necessary?
     // Rename old binary for backup
     /* size_t old_bin_path_len = snprintf(NULL, 0, "%s.old", bin_path); */
@@ -150,23 +93,18 @@ int main(int argc, char **argv) {
     /* } */
 
     printf("Recompiling...\n");
-    cmd_append(&cmd, "gcc", src_path, "-o", bin_path);
-    if (basic) cmd_append(&cmd, CFLAGS_BASIC);
-    else if (strict) cmd_append(&cmd, CFLAGS_STRICT);
-    else if (extra_strict) cmd_append(&cmd, CFLAGS_EXTRA_STRICT);
-    if (fast) cmd_append(&cmd, "-Ofast");
-    if (werror) cmd_append(&cmd, "-Werror");
-    if (debug) cmd_append(&cmd, "-ggdb");
+    cmd_append(&cmd, "gcc", src_path, "-o", bin_path, CFLAGS);
+    if (fast.on) cmd_append(&cmd, "-Ofast");
+    if (werror.on) cmd_append(&cmd, "-Werror");
+    if (debug.on) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
     
-    for (size_t i = 0; i < (size_t) argc; i++) {
-      const char *flag = argv[i];
-      if (strcmp(flag, rebuild_flag_short) == 0) {
-        flag = no_rebuild_flag_short;
-      } else if (strcmp(flag, rebuild_flag_long) == 0) {
-        flag = no_rebuild_flag_long;
-      }
-      cmd_append(&cmd, flag);
+    if (rebuild.on) rebuild.on = false;
+    no_rebuild.on = true;
+    cmd_append(&cmd, bin_path);
+    for (size_t i = 0; i < flags.count; i++) {
+      Flag *flag = flags.items[i];
+      if (flag->on) cmd_append(&cmd, flag->name_short);
     }
     if (!run_cmd(&cmd, redirect, true)) return 1;
     return 0;
@@ -215,24 +153,20 @@ int main(int argc, char **argv) {
     const char *source = sources[0];
     size_t sources_count = sources_counts[i];
     bool rebuild_program = needs_rebuild_multi(program, sources, sources_count);
-    if (!rebuild_program && !rebuild_rest) {
+    if (!rebuild_program && !rebuild_rest.on) {
       if (rebuild_program) printf("rebuild_program\n");
-      if (rebuild) printf("rebuild\n");
+      if (rebuild.on) printf("rebuild\n");
       continue;
     }
 
-    cmd_append(&cmd, "gcc", source, "-o", program);
-    if (basic) cmd_append(&cmd, CFLAGS_BASIC);
-    else if (strict) cmd_append(&cmd, CFLAGS_STRICT);
-    else if (extra_strict) cmd_append(&cmd, CFLAGS_EXTRA_STRICT);
-
-    if (fast) cmd_append(&cmd, "-Ofast");
-    if (werror) cmd_append(&cmd, "-Werror");
-    if (debug) cmd_append(&cmd, "-ggdb");
+    cmd_append(&cmd, "gcc", source, "-o", program, CFLAGS);
+    if (fast.on) cmd_append(&cmd, "-Ofast");
+    if (werror.on) cmd_append(&cmd, "-Werror");
+    if (debug.on) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
 
-  if (test) {
+  if (test.on) {
     enum {
       EXAMPLE_BASE = 0,
       EXAMPLE_TEST,
@@ -293,15 +227,14 @@ int main(int argc, char **argv) {
     };
 
     for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
-      if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
+      if (profile.on) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
       cmd_append(&cmd, "./tare", examples[i]);
       if (!run_cmd(&cmd, redirect, true)) return 1;
     }
   } else {
     // Temporary, for testing the WIP parser.
-    if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full");
     cmd_append(&cmd, "./tare", "./examples/recursion.tare");
-    if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
+    if (profile.on) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
   
@@ -309,25 +242,10 @@ int main(int argc, char **argv) {
 }
 
 void verify_flags(void) {
-#define CFB 3
-#define CFS 10
-#define CFES 42
-
-  const char *cflags_basic[CFB] = {CFLAGS_BASIC};
-  const char *cflags_strict[CFS] = {CFLAGS_STRICT};
-  const char *cflags_extra_strict[CFES] = {CFLAGS_EXTRA_STRICT};
- 
-  // cflags_basic
-  for (size_t i = 0; i < CFB; i++)
-    printf("cflags_basic[%zu]: %s\n", i, cflags_basic[i]);
-  
-  // cflags_strict
-  for (size_t i = 0; i < CFS; i++)
-    printf("cflags_strict[%zu]: %s\n", i, cflags_strict[i]);
-
-  // cflags_extra_strict
-  for (size_t i = 0; i < CFS; i++)
-    printf("cflags_extra_strict[%zu]: %s\n", i, cflags_extra_strict[i]);
+#define CFLAGS_COUNT 42
+  const char *cflags[CFLAGS_COUNT] = {CFLAGS};
+  for (size_t i = 0; i < CFLAGS_COUNT; i++)
+    printf("cflags_extra_strict[%zu]: %s\n", i, cflags[i]);
 }
 
 TARE_DEF bool needs_rebuild(const char *program, const char *source) {

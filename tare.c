@@ -67,9 +67,29 @@ int main(int argc, char **argv) {
   
   const char *path_plain = *argv;
 
-  Flags flags = {0};
-  init_flags(&flags);
+  enum {
+    FLAG_SIMULATE,
+    FLAG_COMPILE_FASM,
+    FLAG_RUN,
+    FLAGS_COUNT,
+  };
+
+  static_assert(FLAGS_COUNT == 3, "Flags count has been chagned. Please update the flags array to match the new count.");
+  Flag sim = { .name_short = "-s", .name_long = "--simulate", };
+  Flag comp = { .name_short = "-c", .name_long = "--compile", };
+  Flag run = { .name_short = "-r", .name_long = "--run", };
+
+  Flag *flag_array[FLAGS_COUNT] = {
+    [FLAG_SIMULATE] = &sim,
+    [FLAG_COMPILE_FASM] = &comp,
+    [FLAG_RUN] = &run,
+  };
+
+  Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   parse_flags(argc, (const char**) argv, &flags);
+
+  if (run.on) comp.on = true;
+  if (comp.on) sim.on = false;
 
   size_t path_len = strlen(path_plain);
   if (!append_sv_to_string(&prog, src)) return 1;
@@ -145,10 +165,8 @@ int main(int argc, char **argv) {
 
     Cmd cmd = {0};
 
-    // Simulator is currently deprecated
-    if (flags.items[FLAG_SIMULATE].on) {
-      ret = sim_tare(&p);
-    } else {
+    if (sim.on) ret = sim_tare(&p);
+    else {
 
       if (time_codegen) start = get_current_time();
       if (!gen_fasm(&p, paths.output)) return 1;
@@ -200,13 +218,15 @@ int main(int argc, char **argv) {
       redirect.fdout = NULL;
       cmd_append(&cmd, "chmod", "+x", paths.output_bin);
       if (!run_cmd(&cmd, redirect, display)) return 1;
+      if (run.on) cmd_append(&cmd, paths.output_bin);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
     }
 /* #endif // THOROUGH_TIMING */
     if (t.l.items) free(t.l.items);
     if (t.items) free(t.items);
 #ifndef THOROUGH_TIMING
     if (cmd.items) free(cmd.items);
-    if (flags.items) free(flags.items);
+    /* if (flags.items) free(flags.items); */
     if (paths.arena.items) free(paths.arena.items);
     if (prog.items) free(prog.items);
 #endif // THOROUGH_TIMING

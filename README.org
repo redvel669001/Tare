@@ -16,7 +16,7 @@ Eventually, I figured it would make sense for Tare to become a sort of "high-lev
 * Goals
 - [X] Decide whether to use a parser or not. - Decision: use a parser.
 - [X] Decide whether to keep the simulator or not. - Decision: keep the simulator.
-- [ ] Revamp the flag parsing.
+- [X] Revamp the flag parsing.
 - [ ] Add optimizations.
 - [ ] Add support for modules.
 - [ ] Rewrite the compiler in tare.
@@ -42,7 +42,7 @@ All in all, the simulator is probably not worth it, but I want to try to keep it
 Having seen how it goes, I have decided to revive the simulator. It wasn't that rough, ultimately. Was worth it.
 
 ** Flags
-Flag parsing needs to be reworked entirely, certainly for the compiler, maybe also for the testing. Not much more to add here!
+Flag parsing has been reworked! It's much simpler now!
 
 ** Tare
 For the language itself, there are also some goals I have in mind!

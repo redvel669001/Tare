@@ -4,6 +4,9 @@
 #define STR_IMPLEMENTATION
 #include "str.h"
 
+#define FLAGS_IMPLEMENTATION
+#include "flags.h"
+
 typedef struct {
   const char *path;
   const char *output;
@@ -75,7 +78,31 @@ const char *examples[EXAMPLES_COUNT] = {
   [EXAMPLES_GLOBALS] = "./examples/globals.tare",
 };
 
-int main(void) {
+int main(int argc, char **argv) {
+  argc--;
+  argv++;
+
+  enum {
+    FLAG_SIMULATE,
+    FLAG_COMPILE_FASM,
+    FLAG_RUN,
+    FLAGS_COUNT,
+  };
+
+  static_assert(FLAGS_COUNT == 3, "Flags count has been chagned. Please update the flags array to match the new count.");
+  Flag sim = { .name_short = "-s", .name_long = "--simulate", };
+  Flag comp = { .name_short = "-c", .name_long = "--compile", };
+  Flag run = { .name_short = "-r", .name_long = "--run", };
+
+  Flag *flag_array[FLAGS_COUNT] = {
+    [FLAG_SIMULATE] = &sim,
+    [FLAG_COMPILE_FASM] = &comp,
+    [FLAG_RUN] = &run,
+  };
+
+  Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
+  parse_flags(argc, (const char**) argv, &flags);
+
   Paths examples_paths[EXAMPLES_COUNT] = {0};
   StringView src = SV_MAKE(./examples/);
   StringView build = SV_MAKE(build/);
@@ -86,29 +113,23 @@ int main(void) {
     if (!paths_from_tare(examples[i], paths, build)) return 1;
   }
 
-  bool build_examples = true;
-  bool run_examples = true;
-
   /* printf("Testing %d tare files...\n\n", EXAMPLES_COUNT); */
-  
+
   Cmd cmd = {0};
   Redirect redirect = {0};
   for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
     if (i == EXAMPLE_FUNC || i == EXAMPLE_READ) continue;
     Paths paths = examples_paths[i];
-    
-    if (build_examples) {
-      printf("--------------------------------------------------\n");
-      cmd_append(&cmd, "./tare", paths.path);
-      if (!run_cmd(&cmd, redirect, true)) return 1;
-    }
 
-    if (run_examples) {
-      cmd_append(&cmd, paths.output_bin);
-      if (!run_cmd(&cmd, redirect, true)) return 1;
-      putchar(10);
-      printf("--------------------------------------------------\n\n");
+    printf("--------------------------------------------------\n");
+    cmd_append(&cmd, "./tare", paths.path);
+    for (size_t j = 0; j < flags.count; j++) {
+      Flag *flag = flags.items[j];
+      if (flag->on) cmd_append(&cmd, flag->name_short);
     }
+    if (!run_cmd(&cmd, redirect, true)) return 1;
+    putchar(10);
+    printf("--------------------------------------------------\n\n");
   }
   
   if (cmd.items) free(cmd.items);
