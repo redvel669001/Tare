@@ -88,9 +88,6 @@ TARE_DEF int sim_tare(Parser *p) {
                     .globals = &globals, .locals = &locals,
                     .stack = &stack, .global_vars = p->globals,
                     .vids = &vids, .fns = p->funcs, };
-
-  da_append(&sim.ret_addrs, -1);
-
   
   if (!sim_funcall(&sim, 0)) return -1;
   
@@ -102,13 +99,22 @@ TARE_DEF int sim_tare(Parser *p) {
   }
   putchar(10);
 
-  if (stack.count == 0) return ret;
 
   for (size_t i = 0; i < stack.count; i++) {
     size_t num = stack.items[i];
     printf("stack[%zu] = %zu\n", i, num);
   }
   
+  if (tape.items) free(tape.items);
+  if (args.items) free(args.items);
+  if (rets.items) free(rets.items);
+  if (globals.items) free(globals.items);
+  if (locals.items) free(locals.items);
+  if (stack.items) free(stack.items);
+  if (vids.items) free(vids.items);
+  if (sim.ret_addrs.items) free(sim.ret_addrs.items);
+  if (stack.count == 0) return ret;
+
   return -1;
 }
 
@@ -349,7 +355,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
       char *item = NULL;
       char *head = NULL;
       size_t offset = 0;
-      
+
       Vid vid = { .vid = op->op };
 
       if (op->type == OP_GVID) {
