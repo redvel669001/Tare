@@ -115,7 +115,6 @@ struct Operation {
   Operation *args;
   size_t args_count;
   size_t op;
-  StringView name;
 };
 
 typedef struct {
@@ -2169,7 +2168,7 @@ TARE_DEF void print_vars(const Vars *vars) {
   }
 }
 
-static_assert(sizeof(Operation) == 56, "Struct `Operation` has been updated. Make sure debugging works out properly.");
+static_assert(sizeof(Operation) == 40, "Struct `Operation` has been updated. Make sure debugging works out properly.");
 TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
   printf("--------------------------------------------------\n");
   debug_print_token(t, op->start);
@@ -2180,8 +2179,6 @@ TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
   printf("  .args = %p\n", (void*)op->args);
   printf("  .args_count = %zu\n", op->args_count);
   printf("  .op = %zu\n", op->op);
-  if (op->name.s != NULL) printf("  .name = %.*s\n", SV_ARG(op->name));
-  else printf("  .name = {.s = %p, .l = %zu}\n", op->name.s, op->name.l);
   printf("}\n");
   printf("--------------------------------------------------\n\n");
 }
