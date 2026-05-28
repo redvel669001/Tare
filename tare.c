@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
   Flags flags = {0};
   init_flags(&flags);
   parse_flags(argc, (const char**) argv, &flags);
-  
+
   size_t path_len = strlen(path_plain);
   if (!append_sv_to_string(&prog, src)) return 1;
   if (!append_to_string(&prog, path_plain, path_len)) return 1;
@@ -80,6 +80,8 @@ int main(int argc, char **argv) {
   Paths paths = {.src = src};
   StringView build = SV_MAKE(build/);
   if (!paths_from_tare(path, &paths, build)) return 1;
+
+  int ret = 0;
 
   bool time_tokenization = false, time_parsing = false, time_codegen = false;
   bool time_fasm = false;
@@ -141,63 +143,64 @@ int main(int argc, char **argv) {
     if (time_parsing) print_elapsed_time(start, end, "Parsing");
 #endif // THOROUGH_TIMING
 
+    Cmd cmd = {0};
+
     // Simulator is currently deprecated
     if (flags.items[FLAG_SIMULATE].on) {
-      return sim_tare(&p);
-    }
+      ret = sim_tare(&p);
+    } else {
 
-    if (time_codegen) start = get_current_time();
-    if (!gen_fasm(&p, paths.output)) return 1;
-    if (time_codegen) end = get_current_time();
+      if (time_codegen) start = get_current_time();
+      if (!gen_fasm(&p, paths.output)) return 1;
+      if (time_codegen) end = get_current_time();
 #ifdef THOROUGH_TIMING
-    if (time_codegen) {
-      current_action_time = ((double) end - start) / 1000000000;
+      if (time_codegen) {
+        current_action_time = ((double) end - start) / 1000000000;
       
-      codegen_time_total += current_action_time;
-      if (current_action_time > codegen_time_worst) codegen_time_worst = current_action_time;
-      if (current_action_time < codegen_time_best) codegen_time_best = current_action_time;
-    }
+        codegen_time_total += current_action_time;
+        if (current_action_time > codegen_time_worst) codegen_time_worst = current_action_time;
+        if (current_action_time < codegen_time_best) codegen_time_best = current_action_time;
+      }
 #else
-    if (time_codegen) print_elapsed_time(start, end, "Codegen");
+      if (time_codegen) print_elapsed_time(start, end, "Codegen");
 #endif // THOROUGH_TIMING
 
-/* #ifndef THOROUGH_TIMING */
-    Cmd cmd = {0};
-    /* int fdout = fileno(stdout); */
-    /* Redirect redirect = {0}; */
-    /* close(fdout); */
+      /* #ifndef THOROUGH_TIMING */
+      /* int fdout = fileno(stdout); */
+      /* Redirect redirect = {0}; */
+      /* close(fdout); */
 
-    FILE *logs = fopen("logs.log", "w");
-    int logs_fd = fileno(logs);
-    Redirect redirect = {.fdout = &logs_fd};
+      FILE *logs = fopen("logs.log", "w");
+      int logs_fd = fileno(logs);
+      Redirect redirect = {.fdout = &logs_fd};
 #ifdef THOROUGH_TIMING
-    bool display = false;
+      bool display = false;
 #else
-    bool display = true;
+      bool display = true;
 #endif // THOROUGH_TIMING
 
-    if (time_fasm) start = get_current_time();
-    cmd_append(&cmd, "fasm", paths.fasm_input);
-    if (!run_cmd(&cmd, redirect, display)) return 1;
-    if (time_fasm) end = get_current_time();
+      if (time_fasm) start = get_current_time();
+      cmd_append(&cmd, "fasm", paths.fasm_input);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
+      if (time_fasm) end = get_current_time();
 
-    if (logs) fclose(logs);
+      if (logs) fclose(logs);
 #ifdef THOROUGH_TIMING
-    if (time_fasm) {
-      current_action_time = ((double) end - start) / 1000000000;
+      if (time_fasm) {
+        current_action_time = ((double) end - start) / 1000000000;
       
-      fasm_time_total += current_action_time;
-      if (current_action_time > fasm_time_worst) fasm_time_worst = current_action_time;
-      if (current_action_time < fasm_time_best) fasm_time_best = current_action_time;
-    }
+        fasm_time_total += current_action_time;
+        if (current_action_time > fasm_time_worst) fasm_time_worst = current_action_time;
+        if (current_action_time < fasm_time_best) fasm_time_best = current_action_time;
+      }
 #else
-    if (time_fasm) print_elapsed_time(start, end, "Fasm");
+      if (time_fasm) print_elapsed_time(start, end, "Fasm");
 #endif // THOROUGH_TIMING
 
-    redirect.fdout = NULL;
-    cmd_append(&cmd, "chmod", "+x", paths.output_bin);
-    if (!run_cmd(&cmd, redirect, display)) return 1;
-
+      redirect.fdout = NULL;
+      cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
+    }
 /* #endif // THOROUGH_TIMING */
     if (t.l.items) free(t.l.items);
     if (t.items) free(t.items);
@@ -257,7 +260,7 @@ int main(int argc, char **argv) {
   
 #endif // THOROUGH_TIMING
   
-  return 0;
+  return ret;
 }
 
 TARE_DEF bool check_bounds(size_t index, size_t count) {
