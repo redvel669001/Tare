@@ -570,6 +570,10 @@ TARE_DEF void read_from_tape(Simulator *sim) {
   else if (sim->r == 8) element.u64 = (size_t *) sim->tape->head;
   else assert(false && "unreachable");
 
+  if (element.u64 >= (size_t *) (sim->tape->items + sim->tape->capacity)) {
+    element.u64 = (size_t *) (sim->tape->items + sim->tape->capacity) - 1;
+  }
+
   sim->tape->value = element;
 }
 
@@ -595,9 +599,11 @@ TARE_DEF size_t value_from_element(Simulator *sim) {
 
 TARE_DEF void init_tape(Tape *tape, size_t tape_size) {
   tape->items = calloc(tape_size, 1);
+  assert(tape->items != NULL && "allocation failed!");
   tape->capacity = tape_size;
   tape->base = (size_t) tape->items;
   tape->head = tape->base;
+  tape->value.u64 = (size_t *) tape->items;
 }
 
 #endif // SIMULATOR_IMPLEMENTATION
