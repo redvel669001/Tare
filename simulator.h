@@ -181,6 +181,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
   case OP_RET:
     if (sim->ret_addrs.count < 1) return false;
     sim->fni = sim->ret_addrs.items[--sim->ret_addrs.count];
+    sim->fn = sim->fns->items + sim->fni;
     break;
   case OP_WRITE:
   case OP_READ:
