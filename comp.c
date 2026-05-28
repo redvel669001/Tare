@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
     };
 
     for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
-      if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full");
+      if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
       cmd_append(&cmd, "./tare", examples[i]);
       if (!run_cmd(&cmd, redirect, true)) return 1;
     }
@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
     // Temporary, for testing the WIP parser.
     if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full");
     cmd_append(&cmd, "./tare", "./examples/recursion.tare");
+    if (profile) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
   
