@@ -4,6 +4,7 @@
 typedef struct {
   const char *name_short;
   const char *name_long;
+  const char *description;
   bool on;
 } Flag;
 
@@ -16,6 +17,7 @@ TARE_DEF void check_flags(const char *arg, Flags *flags);
 TARE_DEF void parse_flags(int argc, const char **argv, Flags *flags);
 
 TARE_DEF void print_flag(Flag flag);
+TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Flags flags);
 
 #endif // FLAGS_H_
 
@@ -44,6 +46,40 @@ TARE_DEF void print_flag(Flag flag) {
   printf("  .on = %s\n", flag.on ? "true" : "false");
   printf("}\n");
   printf("--------------------------------------------------\n");
+}
+
+TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Flags flags) {
+  fprintf(out, "Usage:\n");
+  fprintf(out, "%s %s[FLAGS]\n", program, input);
+  fprintf(out, "\nFLAGS:\n");
+
+  size_t name_short_max_length = 0;
+  size_t name_long_max_length = 0;
+  for (size_t i = 0; i < flags.count; i++) {
+    Flag *flag = flags.items[i];
+    size_t length = strlen(flag->name_short);
+    if (length > name_short_max_length) name_short_max_length = length;
+    length = strlen(flag->name_long);
+    if (length > name_long_max_length) name_long_max_length = length;
+  }
+
+  size_t name_short_max_pad = name_short_max_length;
+  size_t max_pad_rem = name_short_max_pad % 4;
+  if (max_pad_rem != 0) name_short_max_pad += (4 - max_pad_rem);
+  
+  size_t name_long_max_pad = name_long_max_length;
+  max_pad_rem = name_long_max_pad % 4;
+  if (max_pad_rem != 0) name_long_max_pad += (4 - max_pad_rem);
+
+  for (size_t i = 0; i < flags.count; i++) {
+    Flag *flag = flags.items[i];
+    size_t name_short_pad = name_short_max_pad - strlen(flag->name_short);
+    size_t name_long_pad = name_long_max_pad - strlen(flag->name_long);
+    fprintf(out, "  %s%*s|  %s%*s:  %s\n",
+            flag->name_short, (int) name_short_pad, "",
+            flag->name_long, (int) name_long_pad, "",
+            flag->description);
+  }
 }
 
 #endif // FLAGS_IMPLEMENTATION

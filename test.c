@@ -79,29 +79,52 @@ const char *examples[EXAMPLES_COUNT] = {
 };
 
 int main(int argc, char **argv) {
+  const char *program = *argv;
+
   argc--;
   argv++;
 
   enum {
-    FLAG_SIMULATE,
+    FLAG_SIMULATE = 0,
     FLAG_COMPILE_FASM,
     FLAG_RUN,
+    FLAG_HELP,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 3, "Flags count has been chagned. Please update the flags array to match the new count.");
-  Flag sim = { .name_short = "-s", .name_long = "--simulate", };
-  Flag comp = { .name_short = "-c", .name_long = "--compile", };
-  Flag run = { .name_short = "-r", .name_long = "--run", };
+  static_assert(FLAGS_COUNT == 4, "Flags count has been chagned. Please update the flags to match the new count.");
+  Flag sim = {
+    .name_short = "-s", .name_long = "--simulate",
+    .description = "invoke an interpreter instead of a compiler.",
+  };
+  Flag comp = {
+    .name_short = "-c", .name_long = "--compile",
+    .description = "compile a native executable.",
+  };
+  Flag run = {
+    .name_short = "-r", .name_long = "--run",
+    .description = "compile and run a native executable.",
+  };
+  Flag help = {
+    .name_short = "-h", .name_long = "--help",
+    .description = "present this infromation.",
+  };
 
+  static_assert(FLAGS_COUNT == 4, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_SIMULATE] = &sim,
     [FLAG_COMPILE_FASM] = &comp,
     [FLAG_RUN] = &run,
+    [FLAG_HELP] = &help,
   };
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   parse_flags(argc, (const char**) argv, &flags);
+
+  if (help.on) {
+    print_usage(stdout, program, "", flags);
+    return 0;
+  }
 
   Paths examples_paths[EXAMPLES_COUNT] = {0};
   StringView src = SV_MAKE(./examples/);

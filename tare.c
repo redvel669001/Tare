@@ -54,13 +54,12 @@ TARE_DEF size_t get_current_time(void);
 TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
 
 int main(int argc, char **argv) {
+  int ret = 0;
+
   StringView src = SV_MAKE(./examples/);
   String prog = {0};
 
-  if (argc < 2) {
-    fprintf(stderr, "error: Input `tare` file not provided!\n");
-    return 1;
-  }
+  const char *program = *argv;
 
   argc--;
   argv++;
@@ -68,25 +67,77 @@ int main(int argc, char **argv) {
   const char *path_plain = *argv;
 
   enum {
-    FLAG_SIMULATE,
+    FLAG_SIMULATE = 0,
     FLAG_COMPILE_FASM,
     FLAG_RUN,
+    FLAG_TIME_TOKENIZER,
+    FLAG_TIME_PARSER,
+    FLAG_TIME_CODEGEN,
+    FLAG_TIME_FASM,
+    FLAG_HELP,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 3, "Flags count has been chagned. Please update the flags array to match the new count.");
-  Flag sim = { .name_short = "-s", .name_long = "--simulate", };
-  Flag comp = { .name_short = "-c", .name_long = "--compile", };
-  Flag run = { .name_short = "-r", .name_long = "--run", };
+  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the flags to match the new count.");
+  
+  Flag sim = {
+    .name_short = "-s", .name_long = "--simulate",
+    .description = "invoke an interpreter instead of a compiler.",
+  };
+  Flag comp = {
+    .name_short = "-c", .name_long = "--compile",
+    .description = "compile a native executable.",
+  };
+  Flag run = {
+    .name_short = "-r", .name_long = "--run",
+    .description = "compile and run a native executable.",
+  };
+  Flag time_tokenization = {
+    .name_short = "-tt", .name_long = "--time-tokenization",
+    .description = "calculate the time for tokenization.",
+  };
+  Flag time_parsing = {
+    .name_short = "-tp", .name_long = "--time-parsing",
+    .description = "calculate the time for parsing.",
+  };
+  Flag time_codegen = {
+    .name_short = "-tc", .name_long = "--time-codegen",
+    .description = "calculate the time for code generation.",
+  };
+  Flag time_fasm = {
+    .name_short = "-tf", .name_long = "--time-fasm",
+    .description = "calculate the time for the assembler (fasm).",
+  };
+  Flag help = {
+    .name_short = "-h", .name_long = "--help",
+    .description = "present this infromation.",
+  };
 
+  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_SIMULATE] = &sim,
     [FLAG_COMPILE_FASM] = &comp,
     [FLAG_RUN] = &run,
+    [FLAG_TIME_TOKENIZER] = &time_tokenization,
+    [FLAG_TIME_PARSER] = &time_parsing,
+    [FLAG_TIME_CODEGEN] = &time_codegen,
+    [FLAG_TIME_FASM] = &time_fasm,
+    [FLAG_HELP] = &help,
   };
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   parse_flags(argc, (const char**) argv, &flags);
+
+  if (argc < 1) {
+    fprintf(stderr, "Error: input `tare` file not provided!\n");
+    print_usage(stderr, program, "<input> ", flags);
+    return 1;
+  }
+  
+  if (help.on) {
+    print_usage(stdout, program, "<input> ", flags);
+    return 0;
+  }
 
   if (run.on) comp.on = true;
   if (comp.on) sim.on = false;
@@ -100,11 +151,6 @@ int main(int argc, char **argv) {
   Paths paths = {.src = src};
   StringView build = SV_MAKE(build/);
   if (!paths_from_tare(path, &paths, build)) return 1;
-
-  int ret = 0;
-
-  bool time_tokenization = false, time_parsing = false, time_codegen = false;
-  bool time_fasm = false;
 
 #ifdef THOROUGH_TIMING
   double tokenization_time_total = 0;
@@ -133,7 +179,7 @@ int main(int argc, char **argv) {
     if (!tokenize_file(paths.path, &t)) return 1;
     size_t end = get_current_time();
 #ifdef THOROUGH_TIMING
-    if (time_tokenization) {
+    if (time_tokenization.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
       tokenization_time_total += current_action_time;
@@ -141,18 +187,18 @@ int main(int argc, char **argv) {
       if (current_action_time < tokenization_time_best) tokenization_time_best = current_action_time;
     }
 #else
-    if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
+    if (time_tokenization.on) print_elapsed_time(start, end, "Tokenization");
 #endif // THOROUGH_TIMING
   
     Functions funcs = {0};
     Longs gotos = {0};
     Vars globals = {0};
     Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
-    if (time_parsing) start = get_current_time();
+    if (time_parsing.on) start = get_current_time();
     if (!parse_file(&p)) return 1;
-    if (time_parsing) end = get_current_time();
+    if (time_parsing.on) end = get_current_time();
 #ifdef THOROUGH_TIMING
-    if (time_parsing) {
+    if (time_parsing.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
       parsing_time_total += current_action_time;
@@ -160,7 +206,7 @@ int main(int argc, char **argv) {
       if (current_action_time < parsing_time_best) parsing_time_best = current_action_time;
     }
 #else
-    if (time_parsing) print_elapsed_time(start, end, "Parsing");
+    if (time_parsing.on) print_elapsed_time(start, end, "Parsing");
 #endif // THOROUGH_TIMING
 
     Cmd cmd = {0};
@@ -168,11 +214,11 @@ int main(int argc, char **argv) {
     if (sim.on) ret = sim_tare(&p);
     else {
 
-      if (time_codegen) start = get_current_time();
+      if (time_codegen.on) start = get_current_time();
       if (!gen_fasm(&p, paths.output)) return 1;
-      if (time_codegen) end = get_current_time();
+      if (time_codegen.on) end = get_current_time();
 #ifdef THOROUGH_TIMING
-      if (time_codegen) {
+      if (time_codegen.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
         codegen_time_total += current_action_time;
@@ -180,7 +226,7 @@ int main(int argc, char **argv) {
         if (current_action_time < codegen_time_best) codegen_time_best = current_action_time;
       }
 #else
-      if (time_codegen) print_elapsed_time(start, end, "Codegen");
+      if (time_codegen.on) print_elapsed_time(start, end, "Codegen");
 #endif // THOROUGH_TIMING
 
       /* #ifndef THOROUGH_TIMING */
@@ -197,14 +243,14 @@ int main(int argc, char **argv) {
       bool display = true;
 #endif // THOROUGH_TIMING
 
-      if (time_fasm) start = get_current_time();
+      if (time_fasm.on) start = get_current_time();
       cmd_append(&cmd, "fasm", paths.fasm_input);
       if (!run_cmd(&cmd, redirect, display)) return 1;
-      if (time_fasm) end = get_current_time();
+      if (time_fasm.on) end = get_current_time();
 
       if (logs) fclose(logs);
 #ifdef THOROUGH_TIMING
-      if (time_fasm) {
+      if (time_fasm.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
         fasm_time_total += current_action_time;
@@ -212,14 +258,16 @@ int main(int argc, char **argv) {
         if (current_action_time < fasm_time_best) fasm_time_best = current_action_time;
       }
 #else
-      if (time_fasm) print_elapsed_time(start, end, "Fasm");
+      if (time_fasm.on) print_elapsed_time(start, end, "Fasm");
 #endif // THOROUGH_TIMING
 
       redirect.fdout = NULL;
       cmd_append(&cmd, "chmod", "+x", paths.output_bin);
       if (!run_cmd(&cmd, redirect, display)) return 1;
-      if (run.on) cmd_append(&cmd, paths.output_bin);
-      if (!run_cmd(&cmd, redirect, display)) return 1;
+      if (run.on) {
+        cmd_append(&cmd, paths.output_bin);
+        if (!run_cmd(&cmd, redirect, display)) return 1;
+      }
     }
 /* #endif // THOROUGH_TIMING */
     if (t.l.items) free(t.l.items);
