@@ -66,10 +66,12 @@ TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Fla
   size_t name_short_max_pad = name_short_max_length;
   size_t max_pad_rem = name_short_max_pad % 4;
   if (max_pad_rem != 0) name_short_max_pad += (4 - max_pad_rem);
+  if (name_short_max_pad <= name_short_max_length) name_short_max_pad += 2;
   
   size_t name_long_max_pad = name_long_max_length;
   max_pad_rem = name_long_max_pad % 4;
   if (max_pad_rem != 0) name_long_max_pad += (4 - max_pad_rem);
+  if (name_long_max_pad <= name_long_max_length) name_long_max_pad += 2;
 
   for (size_t i = 0; i < flags.count; i++) {
     Flag *flag = flags.items[i];
