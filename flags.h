@@ -53,15 +53,23 @@ TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Fla
   fprintf(out, "%s %s[FLAGS]\n", program, input);
   fprintf(out, "\nFLAGS:\n");
 
+  size_t length = 0;
   size_t name_short_max_length = 0;
   size_t name_long_max_length = 0;
   for (size_t i = 0; i < flags.count; i++) {
     Flag *flag = flags.items[i];
-    size_t length = strlen(flag->name_short);
+    length = strlen(flag->name_short);
     if (length > name_short_max_length) name_short_max_length = length;
     length = strlen(flag->name_long);
     if (length > name_long_max_length) name_long_max_length = length;
   }
+
+  size_t name_short_label_length = strlen("SHORT");
+  length = name_short_label_length;
+  if (length > name_short_max_length) name_short_max_length = length;
+  size_t name_long_label_length = strlen("LONG NAME");
+  length = name_long_label_length;
+  if (length > name_long_max_length) name_long_max_length = length;
 
   size_t name_short_max_pad = name_short_max_length;
   size_t max_pad_rem = name_short_max_pad % 4;
@@ -72,6 +80,15 @@ TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Fla
   max_pad_rem = name_long_max_pad % 4;
   if (max_pad_rem != 0) name_long_max_pad += (4 - max_pad_rem);
   if (name_long_max_pad <= name_long_max_length + 1) name_long_max_pad++;
+
+  printf("  SHORT%*s|  LONG NAME%*s|  DESCRIPTION\n",
+         (int) (name_short_max_pad - name_short_label_length), "",
+         (int) (name_long_max_pad - name_long_label_length), "");
+  length = name_short_max_pad + name_long_max_pad
+    + strlen("DESCRIPTION") + strlen("  |  | \n") + 80;
+  if (length > 80) length = 80;
+  for (size_t i = 0; i < length; i++) putchar('-');
+  putchar(10);
 
   for (size_t i = 0; i < flags.count; i++) {
     Flag *flag = flags.items[i];

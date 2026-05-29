@@ -10,6 +10,7 @@
 
 #include <sys/stat.h>
 
+#define CFLAGS_COUNT 42
 #define CFLAGS "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum"
 
 TARE_DEF void verify_flags(void);
@@ -167,12 +168,13 @@ int main(int argc, char **argv) {
     TEST_SOURCE_TEST_C = 0,
     TEST_SOURCE_CMD_H,
     TEST_SOURCE_STR_H,
+    TEST_SOURCE_FLAGS_H,
     TEST_SOURCES,
   };
   
   static_assert(SOURCES_COUNT == PROGRAMS_COUNT);
-  const char *tare_sources[] = {"./tare.c", "./cmd.h", "codegen.h", "./da.h", "./flags.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h"};
-  const char *test_sources[] = {"./test.c", "./cmd.h", "./str.h"};
+  const char *tare_sources[] = {"./tare.c", "./cmd.h", "codegen.h", "./da.h", "./flags.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h",};
+  const char *test_sources[] = {"./test.c", "./cmd.h", "./str.h", "flags.h",};
   size_t tare_sources_count = sizeof(tare_sources)/sizeof(const char*);
   size_t test_sources_count = sizeof(test_sources)/sizeof(const char*);
   assert(tare_sources_count == TARE_SOURCES);
@@ -278,7 +280,6 @@ int main(int argc, char **argv) {
 }
 
 void verify_flags(void) {
-#define CFLAGS_COUNT 42
   const char *cflags[CFLAGS_COUNT] = {CFLAGS};
   for (size_t i = 0; i < CFLAGS_COUNT; i++)
     printf("cflags_extra_strict[%zu]: %s\n", i, cflags[i]);
