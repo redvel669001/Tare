@@ -46,6 +46,12 @@ typedef struct {
   StringView src;
 } Paths;
 
+typedef struct {
+  double total;
+  double best;
+  double worst;
+} ThoroughTimer;
+
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
 TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
 TARE_DEF void str_to_tare_template(const char *string); // Testing thing
@@ -153,21 +159,10 @@ int main(int argc, char **argv) {
   if (!paths_from_tare(path, &paths, build)) return 1;
 
 #ifdef THOROUGH_TIMING
-  double tokenization_time_total = 0;
-  double tokenization_time_best = 1;
-  double tokenization_time_worst = 0;
-  
-  double parsing_time_total = 0;
-  double parsing_time_best = 1;
-  double parsing_time_worst = 0;
-  
-  double codegen_time_total = 0;
-  double codegen_time_best = 1;
-  double codegen_time_worst = 0;
-
-  double fasm_time_total = 0;
-  double fasm_time_best = 1;
-  double fasm_time_worst = 0;
+  ThoroughTimer tokenization_timer = { .best = 1 };
+  ThoroughTimer parsing_timer      = { .best = 1 };
+  ThoroughTimer codegen_timer      = { .best = 1 };
+  ThoroughTimer fasm_timer         = { .best = 1 };
   
   #define SAMPLE_SIZE 10000
   for (unsigned int counter = 0; counter < SAMPLE_SIZE; counter++) {
@@ -182,9 +177,9 @@ int main(int argc, char **argv) {
     if (time_tokenization.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
-      tokenization_time_total += current_action_time;
-      if (current_action_time > tokenization_time_worst) tokenization_time_worst = current_action_time;
-      if (current_action_time < tokenization_time_best) tokenization_time_best = current_action_time;
+      tokenization_timer.total += current_action_time;
+      if (current_action_time > tokenization_timer.worst) tokenization_timer.worst = current_action_time;
+      if (current_action_time < tokenization_timer.best) tokenization_timer.best = current_action_time;
     }
 #else
     if (time_tokenization.on) print_elapsed_time(start, end, "Tokenization");
@@ -201,9 +196,9 @@ int main(int argc, char **argv) {
     if (time_parsing.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
-      parsing_time_total += current_action_time;
-      if (current_action_time > parsing_time_worst) parsing_time_worst = current_action_time;
-      if (current_action_time < parsing_time_best) parsing_time_best = current_action_time;
+      parsing_timer.total += current_action_time;
+      if (current_action_time > parsing_timer.worst) parsing_timer.worst = current_action_time;
+      if (current_action_time < parsing_timer.best) parsing_timer.best = current_action_time;
     }
 #else
     if (time_parsing.on) print_elapsed_time(start, end, "Parsing");
@@ -221,9 +216,9 @@ int main(int argc, char **argv) {
       if (time_codegen.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
-        codegen_time_total += current_action_time;
-        if (current_action_time > codegen_time_worst) codegen_time_worst = current_action_time;
-        if (current_action_time < codegen_time_best) codegen_time_best = current_action_time;
+        codegen_timer.total += current_action_time;
+        if (current_action_time > codegen_timer.worst) codegen_timer.worst = current_action_time;
+        if (current_action_time < codegen_timer.best) codegen_timer.best = current_action_time;
       }
 #else
       if (time_codegen.on) print_elapsed_time(start, end, "Codegen");
@@ -253,9 +248,9 @@ int main(int argc, char **argv) {
       if (time_fasm.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
-        fasm_time_total += current_action_time;
-        if (current_action_time > fasm_time_worst) fasm_time_worst = current_action_time;
-        if (current_action_time < fasm_time_best) fasm_time_best = current_action_time;
+        fasm_timer.total += current_action_time;
+        if (current_action_time > fasm_timer.worst) fasm_timer.worst = current_action_time;
+        if (current_action_time < fasm_timer.best) fasm_timer.best = current_action_time;
       }
 #else
       if (time_fasm.on) print_elapsed_time(start, end, "Fasm");
@@ -297,34 +292,34 @@ int main(int argc, char **argv) {
 #else
   }
 
-  double tokenization_time_average = tokenization_time_total / SAMPLE_SIZE;
-  double parsing_time_average = parsing_time_total / SAMPLE_SIZE;
-  double codegen_time_average = codegen_time_total / SAMPLE_SIZE;
-  double fasm_time_average = fasm_time_total / SAMPLE_SIZE;
+  double tokenization_time_average = tokenization_timer.total / SAMPLE_SIZE;
+  double parsing_time_average = parsing_timer.total / SAMPLE_SIZE;
+  double codegen_time_average = codegen_timer.total / SAMPLE_SIZE;
+  double fasm_time_average = fasm_timer.total / SAMPLE_SIZE;
 
   printf("Tokenization:\n");
-  printf("    Total: %lf\n", tokenization_time_total);
+  printf("    Total: %lf\n", tokenization_timer.total);
   printf("    Average: %lf\n", tokenization_time_average);
-  printf("    Best: %lf\n", tokenization_time_best);
-  printf("    Worst: %lf\n", tokenization_time_worst);
+  printf("    Best: %lf\n", tokenization_timer.best);
+  printf("    Worst: %lf\n", tokenization_timer.worst);
   
   printf("Parsing:\n");
-  printf("    Total: %lf\n", parsing_time_total);
+  printf("    Total: %lf\n", parsing_timer.total);
   printf("    Average: %lf\n", parsing_time_average);
-  printf("    Best: %lf\n", parsing_time_best);
-  printf("    Worst: %lf\n", parsing_time_worst);
+  printf("    Best: %lf\n", parsing_timer.best);
+  printf("    Worst: %lf\n", parsing_timer.worst);
 
   printf("Codegen:\n");
-  printf("    Total: %lf\n", codegen_time_total);
+  printf("    Total: %lf\n", codegen_timer.total);
   printf("    Average: %lf\n", codegen_time_average);
-  printf("    Best: %lf\n", codegen_time_best);
-  printf("    Worst: %lf\n", codegen_time_worst);
+  printf("    Best: %lf\n", codegen_timer.best);
+  printf("    Worst: %lf\n", codegen_timer.worst);
 
   printf("Fasm:\n");
-  printf("    Total: %lf\n", fasm_time_total);
+  printf("    Total: %lf\n", fasm_timer.total);
   printf("    Average: %lf\n", fasm_time_average);
-  printf("    Best: %lf\n", fasm_time_best);
-  printf("    Worst: %lf\n", fasm_time_worst);
+  printf("    Best: %lf\n", fasm_timer.best);
+  printf("    Worst: %lf\n", fasm_timer.worst);
   
 #endif // THOROUGH_TIMING
   
