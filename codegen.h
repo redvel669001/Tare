@@ -34,7 +34,6 @@
 typedef struct {
   Longs *longs; // Numbers too big to be passed directly to registers.
   Longs *gotos; // Current goto, e.g. in a loop.
-  /* bool fail; */
   struct {
     size_t r; // current read size in bytes
     size_t mask;

@@ -110,10 +110,8 @@ typedef enum {
 } OpPrec;
 
 struct Operation {
-  Token *start;
   OpType type;
-  Operation *args;
-  size_t args_count;
+  Token *start;
   size_t op;
 };
 
@@ -2168,7 +2166,7 @@ TARE_DEF void print_vars(const Vars *vars) {
   }
 }
 
-static_assert(sizeof(Operation) == 40, "Struct `Operation` has been updated. Make sure debugging works out properly.");
+static_assert(sizeof(Operation) == 24, "Struct `Operation` has been updated. Make sure debugging works out properly.");
 TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
   printf("--------------------------------------------------\n");
   debug_print_token(t, op->start);
@@ -2176,8 +2174,6 @@ TARE_DEF void print_op(const Tokenizer *t, const Operation *op, size_t i) {
   printf("  .start = ");
   debug_print_token(t, op->start);
   printf("  .type = %s\n", op_type_as_string(op->type));
-  printf("  .args = %p\n", (void*)op->args);
-  printf("  .args_count = %zu\n", op->args_count);
   printf("  .op = %zu\n", op->op);
   printf("}\n");
   printf("--------------------------------------------------\n\n");

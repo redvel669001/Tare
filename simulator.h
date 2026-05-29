@@ -29,7 +29,6 @@ typedef struct {
 
 typedef struct {
   Tape *tape;
-  bool fail;
   size_t r; // current read size in bytes
   Parser *p;
   Tape *args;
