@@ -36,19 +36,49 @@ int main(int argc, char **argv) {
     FLAG_DEBUG,
     FLAG_PROFILE,
     FLAG_TEST,
+    FLAG_HELP,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the flags array to match the new count.");
-  Flag fast = { .name_short = "-f", .name_long = "--fast", };
-  Flag werror = { .name_short = "-we", .name_long = "--werror", };
-  Flag rebuild = { .name_short = "-rb", .name_long = "--rebuild", };
-  Flag no_rebuild = { .name_short = "-nrb", .name_long = "--no-rebuild", };
-  Flag rebuild_rest = { .name_short = "-rbr", .name_long = "--rebuild-rest", };
-  Flag debug = { .name_short = "-g", .name_long = "--debug", };
-  Flag profile = { .name_short = "-p", .name_long = "--profile", };
-  Flag test = { .name_short = "-t", .name_long = "--test", };
+  static_assert(FLAGS_COUNT == 9, "Flags count has been chagned. Please update the flags to match the new count.");
+  Flag fast = {
+    .name_short = "-f", .name_long = "--fast",
+    .description = "use optimization when compiling [-Ofast flag].",
+  };
+  Flag werror = {
+    .name_short = "-we", .name_long = "--werror",
+    .description = "treat warnings as errors when compiling [-Werror flag].",
+  };
+  Flag rebuild = {
+    .name_short = "-rb", .name_long = "--rebuild",
+    .description = "force the compiler to rebuild itself.",
+  };
+  Flag no_rebuild = {
+    .name_short = "-nrb", .name_long = "--no-rebuild",
+    .description = "force the compiler to NOT rebuild itself.",
+  };
+  Flag rebuild_rest = {
+    .name_short = "-rbr", .name_long = "--rebuild-rest",
+    .description = "force the compiler to rebuild the project.",
+  };
+  Flag debug = {
+    .name_short = "-g", .name_long = "--debug",
+    .description = "compile with debug information [-g or --ggdb flag].",
+  };
+  Flag profile = {
+    .name_short = "-p", .name_long = "--profile",
+    .description = "profile `tare` with valgrind to fix bugs and improve it.",
+  };
+  Flag test = {
+    .name_short = "-t", .name_long = "--test",
+    .description = "run some examples to verify `tare` working as intended.",
+  };
+  Flag help = {
+    .name_short = "-h", .name_long = "--help",
+    .description = "present this infromation.",
+  };
   
+  static_assert(FLAGS_COUNT == 9, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_FAST] = &fast,
     [FLAG_WERROR] = &werror,
@@ -58,6 +88,7 @@ int main(int argc, char **argv) {
     [FLAG_DEBUG] = &debug,
     [FLAG_PROFILE] = &profile,
     [FLAG_TEST] = &test,
+    [FLAG_HELP] = &help,
   };
 
   size_t rebuild_index = FLAG_REBUILD;
@@ -73,6 +104,11 @@ int main(int argc, char **argv) {
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   parse_flags(argc, (const char**) argv, &flags);
+
+  if (help.on) {
+    print_usage(stdout, bin_path, "", flags);
+    return 0;
+  }
 
   if (no_rebuild.on) rebuild.on = false;
 
