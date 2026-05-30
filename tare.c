@@ -67,6 +67,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
 
 TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, size_t count);
 TARE_DEF int comp_or_sim_once(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, String *prog);
+TARE_DEF void time_current_action(ThoroughTimer *t, size_t start, size_t end);
 
 int main(int argc, char **argv) {
   int ret = 0;
@@ -551,17 +552,11 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, boo
   Cmd cmd = {0};
 
   for (unsigned int counter = 0; counter < count; counter++) {
-    double current_action_time = 0;
     Tokenizer t = {0};
     size_t start = get_current_time();
     if (!tokenize_file(paths.path, &t)) return 1;
     size_t end = get_current_time();
-    if (time_tokenization) {
-      current_action_time = ((double) end - start) / 1000000000;
-      tokenization_timer.total += current_action_time;
-      if (current_action_time > tokenization_timer.worst) tokenization_timer.worst = current_action_time;
-      if (current_action_time < tokenization_timer.best) tokenization_timer.best = current_action_time;
-    }
+    if (time_tokenization) time_current_action(&tokenization_timer, start, end);
 
     Functions funcs = {0};
     Longs gotos = {0};
@@ -570,12 +565,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, boo
     if (time_parsing) start = get_current_time();
     if (!parse_file(&p)) return 1;
     if (time_parsing) end = get_current_time();
-    if (time_parsing) {
-      current_action_time = ((double) end - start) / 1000000000;
-      parsing_timer.total += current_action_time;
-      if (current_action_time > parsing_timer.worst) parsing_timer.worst = current_action_time;
-      if (current_action_time < parsing_timer.best) parsing_timer.best = current_action_time;
-    }
+    if (time_parsing) time_current_action(&parsing_timer, start, end);
 
     if (sim) {
       Tape tape = {0};
@@ -602,12 +592,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, boo
       if (time_simulator) start = get_current_time();
       ret = sim_tare(&simulator);
       if (time_simulator) end = get_current_time();
-      if (time_simulator) {
-        current_action_time = ((double) end - start) / 1000000000;
-        sim_timer.total += current_action_time;
-        if (current_action_time > sim_timer.worst) sim_timer.worst = current_action_time;
-        if (current_action_time < sim_timer.best) sim_timer.best = current_action_time;
-      }
+      if (time_simulator) time_current_action(&sim_timer, start, end);
 
       if (tape.items) free(tape.items);
       if (args_sim.items) free(args_sim.items);
@@ -634,13 +619,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, boo
       if (!gen_fasm(paths.output, &gen)) return 1;
       if (time_codegen) end = get_current_time();
       if (longs.items) free(longs.items);
-      /* if (gotos.items) free(gotos.items); */
-      if (time_codegen) {
-        current_action_time = ((double) end - start) / 1000000000;
-        codegen_timer.total += current_action_time;
-        if (current_action_time > codegen_timer.worst) codegen_timer.worst = current_action_time;
-        if (current_action_time < codegen_timer.best) codegen_timer.best = current_action_time;
-      }
+      if (time_codegen) time_current_action(&codegen_timer, start, end);
 
       FILE *logs = fopen("logs.log", "w");
       int logs_fd = fileno(logs);
@@ -653,13 +632,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, boo
       if (time_fasm) end = get_current_time();
 
       if (logs) fclose(logs);
-      if (time_fasm) {
-        current_action_time = ((double) end - start) / 1000000000;
-
-        fasm_timer.total += current_action_time;
-        if (current_action_time > fasm_timer.worst) fasm_timer.worst = current_action_time;
-        if (current_action_time < fasm_timer.best) fasm_timer.best = current_action_time;
-      }
+      if (time_fasm) time_current_action(&fasm_timer, start, end);
 
       redirect.fdout = NULL;
       cmd_append(&cmd, "chmod", "+x", paths.output_bin);
@@ -852,4 +825,11 @@ TARE_DEF int comp_or_sim_once(Paths paths, bool time_tokenization, bool time_par
   if (gotos.items) free(gotos.items);
   if (globals.items) free(globals.items);
   return ret;
+}
+
+TARE_DEF void time_current_action(ThoroughTimer *t, size_t start, size_t end) {
+  double current_action_time = ((double) end - start) / 1000000000;
+  t->total += current_action_time;
+  if (current_action_time > t->worst) t->worst = current_action_time;
+  if (current_action_time < t->best) t->best = current_action_time;
 }
