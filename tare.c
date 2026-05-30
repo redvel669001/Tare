@@ -65,6 +65,9 @@ TARE_DEF void str_to_tare_template(const char *string); // Testing thing
 TARE_DEF size_t get_current_time(void);
 TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
 
+TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, size_t count);
+TARE_DEF int comp_or_sim_once(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, String *prog);
+
 int main(int argc, char **argv) {
   int ret = 0;
 
@@ -86,6 +89,8 @@ int main(int argc, char **argv) {
     FLAG_TIME_PARSER,
     FLAG_TIME_CODEGEN,
     FLAG_TIME_FASM,
+    FLAG_TIME_SIMULATOR,
+    FLAG_TIME_THOROUGHLY,
     FLAG_TAPE_SIZE,
     FLAG_ARG_TAPE_SIZE,
     FLAG_RET_TAPE_SIZE,
@@ -95,7 +100,7 @@ int main(int argc, char **argv) {
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 13, "Flags count has been chagned. Please update the flags to match the new count.");
+  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the flags to match the new count.");
   
   Flag sim = {
     .name_short = "-s", .name_long = "--simulate",
@@ -124,6 +129,16 @@ int main(int argc, char **argv) {
   Flag time_fasm = {
     .name_short = "-tf", .name_long = "--time-fasm",
     .description = "calculate the time for the assembler (fasm).",
+  };
+  Flag time_simulator = {
+    .name_short = "-ts", .name_long = "--time-simulator",
+    .description = "calculate the time for the simulator.",
+  };
+  Flag time_thoroughly = {
+    .name_short = "-tith", .name_long = "--time-thoroughly",
+    .description = "collect timing statistics for every part of the compiler.",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = 1,
   };
   Flag tape_size = {
     .name_short = "-ts", .name_long = "--tape-size",
@@ -160,7 +175,7 @@ int main(int argc, char **argv) {
     .description = "present this infromation.",
   };
 
-  static_assert(FLAGS_COUNT == 13, "Flags count has been chagned. Please update the array to match the new count.");
+  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_SIMULATE] = &sim,
     [FLAG_COMPILE_FASM] = &comp,
@@ -168,12 +183,14 @@ int main(int argc, char **argv) {
     [FLAG_TIME_TOKENIZER] = &time_tokenization,
     [FLAG_TIME_PARSER] = &time_parsing,
     [FLAG_TIME_CODEGEN] = &time_codegen,
+    [FLAG_TIME_FASM] = &time_fasm,
+    [FLAG_TIME_SIMULATOR] = &time_simulator,
+    [FLAG_TIME_THOROUGHLY] = &time_thoroughly,
     [FLAG_TAPE_SIZE] = &tape_size,
     [FLAG_ARG_TAPE_SIZE] = &arg_tape_size,
     [FLAG_RET_TAPE_SIZE] = &ret_tape_size,
     [FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
     [FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
-    [FLAG_TIME_FASM] = &time_fasm,
     [FLAG_HELP] = &help,
   };
 
@@ -199,6 +216,14 @@ int main(int argc, char **argv) {
   if (run.value.on) comp.value.on = true;
   if (comp.value.on) sim.value.on = false;
 
+  if (time_thoroughly.parsed) {
+    time_tokenization.value.on = true;
+    time_parsing.value.on = true;
+    if (comp.value.on) time_codegen.value.on = true;
+    if (run.value.on) time_fasm.value.on = true;
+    if (sim.value.on) time_simulator.value.on = true;
+  }
+
   size_t path_len = strlen(path_plain);
   if (!append_sv_to_string(&prog, src)) return 1;
   if (!append_to_string(&prog, path_plain, path_len)) return 1;
@@ -208,6 +233,26 @@ int main(int argc, char **argv) {
   Paths paths = {.src = src};
   StringView build = SV_MAKE(build/);
   if (!paths_from_tare(path, &paths, build)) return 1;
+
+  ret =
+    comp_or_sim_multiple_times
+    (paths, time_tokenization.value.on, time_parsing.value.on,
+     time_codegen.value.on, time_fasm.value.on, time_simulator.value.on,
+     run.value.on, sim.value.on, tape_size.value.u64,
+     arg_tape_size.value.u64, ret_tape_size.value.u64,
+     global_var_tape_size.value.u64, local_var_tape_size.value.u64,
+     time_thoroughly.value.u64);
+
+  if (prog.items) free(prog.items);
+  return ret;
+
+  return
+    comp_or_sim_once
+    (paths, time_tokenization.value.on, time_parsing.value.on,
+     time_codegen.value.on, time_fasm.value.on, time_simulator.value.on,
+     run.value.on, sim.value.on, tape_size.value.u64,
+     arg_tape_size.value.u64, ret_tape_size.value.u64,
+     global_var_tape_size.value.u64, local_var_tape_size.value.u64, &prog);
 
 #ifdef THOROUGH_TIMING
   ThoroughTimer tokenization_timer = { .best = 1 };
@@ -493,4 +538,318 @@ TARE_DEF size_t get_current_time(void) {
 
 TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) {
   printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
+}
+
+TARE_DEF int comp_or_sim_multiple_times(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, size_t count) {
+  int ret = 0;
+  ThoroughTimer tokenization_timer = { .best = 1 };
+  ThoroughTimer parsing_timer      = { .best = 1 };
+  ThoroughTimer codegen_timer      = { .best = 1 };
+  ThoroughTimer fasm_timer         = { .best = 1 };
+  ThoroughTimer sim_timer          = { .best = 1 };
+
+  Cmd cmd = {0};
+
+  for (unsigned int counter = 0; counter < count; counter++) {
+    double current_action_time = 0;
+    Tokenizer t = {0};
+    size_t start = get_current_time();
+    if (!tokenize_file(paths.path, &t)) return 1;
+    size_t end = get_current_time();
+    if (time_tokenization) {
+      current_action_time = ((double) end - start) / 1000000000;
+      tokenization_timer.total += current_action_time;
+      if (current_action_time > tokenization_timer.worst) tokenization_timer.worst = current_action_time;
+      if (current_action_time < tokenization_timer.best) tokenization_timer.best = current_action_time;
+    }
+
+    Functions funcs = {0};
+    Longs gotos = {0};
+    Vars globals = {0};
+    Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
+    if (time_parsing) start = get_current_time();
+    if (!parse_file(&p)) return 1;
+    if (time_parsing) end = get_current_time();
+    if (time_parsing) {
+      current_action_time = ((double) end - start) / 1000000000;
+      parsing_timer.total += current_action_time;
+      if (current_action_time > parsing_timer.worst) parsing_timer.worst = current_action_time;
+      if (current_action_time < parsing_timer.best) parsing_timer.best = current_action_time;
+    }
+
+    if (sim) {
+      Tape tape = {0};
+      init_tape(&tape, tape_size);
+      Tape args_sim = {0};
+      init_tape(&args_sim, arg_tape_size);
+      Tape rets = {0};
+      init_tape(&rets, ret_tape_size);
+      Tape globals_sim = {0};
+      init_tape(&globals_sim, global_var_tape_size);
+      Tape locals = {0};
+      init_tape(&locals, local_var_tape_size);
+      Longs stack = {0};
+      Vids vids = {0};
+
+      Simulator simulator = {
+        .tape = &tape, .r = 8, .p = &p,
+        .args = &args_sim, .rets = &rets,
+        .globals = &globals_sim, .locals = &locals,
+        .stack = &stack, .global_vars = p.globals,
+        .vids = &vids, .fns = p.funcs,
+      };
+
+      if (time_simulator) start = get_current_time();
+      ret = sim_tare(&simulator);
+      if (time_simulator) end = get_current_time();
+      if (time_simulator) {
+        current_action_time = ((double) end - start) / 1000000000;
+        sim_timer.total += current_action_time;
+        if (current_action_time > sim_timer.worst) sim_timer.worst = current_action_time;
+        if (current_action_time < sim_timer.best) sim_timer.best = current_action_time;
+      }
+
+      if (tape.items) free(tape.items);
+      if (args_sim.items) free(args_sim.items);
+      if (rets.items) free(rets.items);
+      if (globals_sim.items) free(globals_sim.items);
+      if (locals.items) free(locals.items);
+      if (stack.items) free(stack.items);
+      if (vids.items) free(vids.items);
+      if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
+    } else {
+      Longs longs = {0};
+      Generator gen = {
+        .longs = &longs, .t = &t,
+        .fn = funcs.items, .op = funcs.items->items,
+        .fns = &funcs,
+        .globals = p.globals,
+        .tape_size = tape_size,
+        .arg_tape_size = arg_tape_size,
+        .ret_tape_size = ret_tape_size,
+        .global_var_tape_size = global_var_tape_size,
+        .local_var_tape_size = local_var_tape_size,
+      };
+      if (time_codegen) start = get_current_time();
+      if (!gen_fasm(paths.output, &gen)) return 1;
+      if (time_codegen) end = get_current_time();
+      if (longs.items) free(longs.items);
+      /* if (gotos.items) free(gotos.items); */
+      if (time_codegen) {
+        current_action_time = ((double) end - start) / 1000000000;
+        codegen_timer.total += current_action_time;
+        if (current_action_time > codegen_timer.worst) codegen_timer.worst = current_action_time;
+        if (current_action_time < codegen_timer.best) codegen_timer.best = current_action_time;
+      }
+
+      FILE *logs = fopen("logs.log", "w");
+      int logs_fd = fileno(logs);
+      Redirect redirect = {.fdout = &logs_fd};
+      bool display = false;
+
+      if (time_fasm) start = get_current_time();
+      cmd_append(&cmd, "fasm", paths.fasm_input);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
+      if (time_fasm) end = get_current_time();
+
+      if (logs) fclose(logs);
+      if (time_fasm) {
+        current_action_time = ((double) end - start) / 1000000000;
+
+        fasm_timer.total += current_action_time;
+        if (current_action_time > fasm_timer.worst) fasm_timer.worst = current_action_time;
+        if (current_action_time < fasm_timer.best) fasm_timer.best = current_action_time;
+      }
+
+      redirect.fdout = NULL;
+      cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
+      if (run) {
+        cmd_append(&cmd, paths.output_bin);
+        if (!run_cmd(&cmd, redirect, display)) return 1;
+      }
+    }
+    if (t.l.items) free(t.l.items);
+    if (t.items) free(t.items);
+    for (size_t i = 0 ; i < funcs.count; i++) {
+      Function fn = funcs.items[i];
+      if (fn.items) free(fn.items);
+      if (fn.lvars.items) free(fn.lvars.items);
+      if (fn.args.items) free(fn.args.items);
+      if (fn.rets.items) free(fn.rets.items);
+    }
+
+    if (p.stack.items) free(p.stack.items);
+    if (funcs.items) free(funcs.items);
+    if (gotos.items) free(gotos.items);
+    if (globals.items) free(globals.items);
+  }
+
+  if (cmd.items) free(cmd.items);
+  if (paths.arena.items) free(paths.arena.items);
+
+  double tokenization_time_average = tokenization_timer.total / count;
+  double parsing_time_average = parsing_timer.total / count;
+  double codegen_time_average = codegen_timer.total / count;
+  double fasm_time_average = fasm_timer.total / count;
+  double sim_time_average = sim_timer.total / count;
+
+  if (time_tokenization) {
+    printf("Tokenization:\n");
+    printf("    Total: %lf\n", tokenization_timer.total);
+    printf("    Average: %lf\n", tokenization_time_average);
+    printf("    Best: %lf\n", tokenization_timer.best);
+    printf("    Worst: %lf\n", tokenization_timer.worst);
+  }
+
+  if (time_parsing) {
+    printf("Parsing:\n");
+    printf("    Total: %lf\n", parsing_timer.total);
+    printf("    Average: %lf\n", parsing_time_average);
+    printf("    Best: %lf\n", parsing_timer.best);
+    printf("    Worst: %lf\n", parsing_timer.worst);
+  }
+
+  if (time_codegen) {
+    printf("Codegen:\n");
+    printf("    Total: %lf\n", codegen_timer.total);
+    printf("    Average: %lf\n", codegen_time_average);
+    printf("    Best: %lf\n", codegen_timer.best);
+    printf("    Worst: %lf\n", codegen_timer.worst);
+  }
+
+  if (time_fasm) {
+    printf("Fasm:\n");
+    printf("    Total: %lf\n", fasm_timer.total);
+    printf("    Average: %lf\n", fasm_time_average);
+    printf("    Best: %lf\n", fasm_timer.best);
+    printf("    Worst: %lf\n", fasm_timer.worst);
+  }
+
+  if (time_simulator) {
+    printf("Simulation:\n");
+    printf("    Total: %lf\n", sim_timer.total);
+    printf("    Average: %lf\n", sim_time_average);
+    printf("    Best: %lf\n", sim_timer.best);
+    printf("    Worst: %lf\n", sim_timer.worst);
+  }
+
+  return ret;
+}
+
+TARE_DEF int comp_or_sim_once(Paths paths, bool time_tokenization, bool time_parsing, bool time_codegen, bool time_fasm, bool time_simulator, bool run, bool sim, size_t tape_size, size_t arg_tape_size, size_t ret_tape_size, size_t global_var_tape_size, size_t local_var_tape_size, String *prog) {
+  int ret = 0;
+  Tokenizer t = {0};
+  size_t start = get_current_time();
+  if (!tokenize_file(paths.path, &t)) return 1;
+  size_t end = get_current_time();
+  if (time_tokenization) print_elapsed_time(start, end, "Tokenization");
+
+  Functions funcs = {0};
+  Longs gotos = {0};
+  Vars globals = {0};
+  Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
+  if (time_parsing) start = get_current_time();
+  if (!parse_file(&p)) return 1;
+  if (time_parsing) end = get_current_time();
+  if (time_parsing) print_elapsed_time(start, end, "Parsing");
+
+  Cmd cmd = {0};
+
+  if (sim) {
+    Tape tape = {0};
+    init_tape(&tape, tape_size);
+    Tape args_sim = {0};
+    init_tape(&args_sim, arg_tape_size);
+    Tape rets = {0};
+    init_tape(&rets, ret_tape_size);
+    Tape globals_sim = {0};
+    init_tape(&globals_sim, global_var_tape_size);
+    Tape locals = {0};
+    init_tape(&locals, local_var_tape_size);
+    Longs stack = {0};
+    Vids vids = {0};
+
+    Simulator simulator = {
+      .tape = &tape, .r = 8, .p = &p,
+      .args = &args_sim, .rets = &rets,
+      .globals = &globals_sim, .locals = &locals,
+      .stack = &stack, .global_vars = p.globals,
+      .vids = &vids, .fns = p.funcs,
+    };
+
+    if (time_simulator) start = get_current_time();
+    ret = sim_tare(&simulator);
+    if (time_simulator) end = get_current_time();
+    if (time_simulator) print_elapsed_time(start, end, "Simulation");
+
+    if (tape.items) free(tape.items);
+    if (args_sim.items) free(args_sim.items);
+    if (rets.items) free(rets.items);
+    if (globals_sim.items) free(globals_sim.items);
+    if (locals.items) free(locals.items);
+    if (stack.items) free(stack.items);
+    if (vids.items) free(vids.items);
+    if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
+    return ret;
+  } else {
+    Longs longs = {0};
+    Generator gen = {
+      .longs = &longs, .t = &t,
+      .fn = funcs.items, .op = funcs.items->items,
+      .fns = &funcs,
+      .globals = p.globals,
+      .tape_size = tape_size,
+      .arg_tape_size = arg_tape_size,
+      .ret_tape_size = ret_tape_size,
+      .global_var_tape_size = global_var_tape_size,
+      .local_var_tape_size = local_var_tape_size,
+    };
+    if (time_codegen) start = get_current_time();
+    if (!gen_fasm(paths.output, &gen)) return 1;
+    if (time_codegen) end = get_current_time();
+    if (longs.items) free(longs.items);
+    if (time_codegen) print_elapsed_time(start, end, "Codegen");
+
+    FILE *logs = fopen("logs.log", "w");
+    int logs_fd = fileno(logs);
+    Redirect redirect = {.fdout = &logs_fd};
+    bool display = true;
+
+    if (time_fasm) start = get_current_time();
+    cmd_append(&cmd, "fasm", paths.fasm_input);
+    if (!run_cmd(&cmd, redirect, display)) return 1;
+    if (time_fasm) end = get_current_time();
+
+    if (logs) fclose(logs);
+    if (time_fasm) print_elapsed_time(start, end, "Fasm");
+
+    redirect.fdout = NULL;
+    cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+    if (!run_cmd(&cmd, redirect, display)) return 1;
+    if (run) {
+      cmd_append(&cmd, paths.output_bin);
+      if (!run_cmd(&cmd, redirect, display)) return 1;
+    }
+  }
+
+  if (t.l.items) free(t.l.items);
+  if (t.items) free(t.items);
+  if (cmd.items) free(cmd.items);
+  if (paths.arena.items) free(paths.arena.items);
+  if (prog->items) free(prog->items);
+
+  for (size_t i = 0 ; i < funcs.count; i++) {
+    Function fn = funcs.items[i];
+    if (fn.items) free(fn.items);
+    if (fn.lvars.items) free(fn.lvars.items);
+    if (fn.args.items) free(fn.args.items);
+    if (fn.rets.items) free(fn.rets.items);
+  }
+
+  if (p.stack.items) free(p.stack.items);
+  if (funcs.items) free(funcs.items);
+  if (gotos.items) free(gotos.items);
+  if (globals.items) free(globals.items);
+  return ret;
 }
