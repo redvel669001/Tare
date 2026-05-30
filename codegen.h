@@ -12,19 +12,9 @@
 #define RETS_HEAD_NAME "rets_head"
 #define RETS_HEAD "[" RETS_HEAD_NAME "]"
 
-/* #define GVARS_HEAD_NAME "global_vars_head" */
-/* #define GVARS_HEAD "[" GVARS_HEAD_NAME "]" */
-
 #define LVARS_HEAD_NAME "local_vars_head"
 #define LVARS_HEAD "[" LVARS_HEAD_NAME "]"
 
-// TODO: Make tape sizes compile-time and runtime variables.
-#define TAPE_SIZE (size_t) 1024
-#define ARG_STACK_SIZE (size_t) 1024
-#define RET_STACK_SIZE (size_t) 1024
-#define GLOBAL_VAR_STACK_SIZE (size_t) 1024
-#define LOCAL_VAR_STACK_SIZE (size_t) 1024
-  
 #define TAPE_NAME "tape"
 #define ARGS_NAME "function_arguments_tape"
 #define RETS_NAME "return_values_tape"
@@ -33,12 +23,16 @@
 
 typedef struct {
   Longs *longs; // Numbers too big to be passed directly to registers.
-  Longs *gotos; // Current goto, e.g. in a loop.
   struct {
     size_t r; // current read size in bytes
     size_t mask;
     size_t shift;
   };
+  size_t tape_size;
+  size_t arg_tape_size;
+  size_t ret_tape_size;
+  size_t global_var_tape_size;
+  size_t local_var_tape_size;
   Tokenizer *t;
   String errors; // Doesn't really make much sense anymore.
   Longs error_indices; // Doesn't really make much sense anymore.
@@ -49,7 +43,7 @@ typedef struct {
   Vars *globals;
 } Generator;
 
-TARE_DEF bool gen_fasm(Parser *p, const char *output);
+TARE_DEF bool gen_fasm(const char *output, Generator *g);
 
 TARE_DEF bool gen_func(Generator *g, FILE *f);
 TARE_DEF bool gen_op(Generator *g, FILE *f);
@@ -73,7 +67,7 @@ TARE_DEF void gen_tape_op(FILE *f);
 TARE_DEF void gen_head_op(FILE *f);
 TARE_DEF void gen_base_op(FILE *f);
 TARE_DEF void gen_index_op(FILE *f);
-TARE_DEF void gen_length_op(FILE *f);
+TARE_DEF void gen_length_op(Generator *g, FILE *f);
 
 /* TARE_DEF bool gen_const_op(Generator *g, FILE *f); */
 
@@ -127,10 +121,10 @@ TARE_DEF size_t find_long(Longs *longs, size_t op);
 #endif // CODEGEN_H_
 #ifdef CODEGEN_IMPLEMENTATION
 
-TARE_DEF bool gen_fasm(Parser *p, const char *output) {
-  if (p == NULL || output == NULL) return false;
+TARE_DEF bool gen_fasm(const char *output, Generator *g) {
+  if (output == NULL || g == NULL) return false;
   
-  Tokenizer *t = p->t;
+  Tokenizer *t = g->t;
   first_token(t);
 
   FILE *f = fopen(output, "wb");
@@ -138,14 +132,6 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
     fprintf(stderr, "error: couldn't open file %s\n", output);
     return false;
   }
-
-  Functions *fns = p->funcs;
-
-  Longs longs = {0};
-  Longs gotos = {0};
-  Generator gen = { .longs = &longs, .t = t,
-                   .fn = fns->items, .op = fns->items->items, .fns = fns,
-                   .gotos = &gotos, .globals = p->globals, };
 
   // Boilerplate
   fprintf(f, "format ELF64 executable 3\n");
@@ -156,49 +142,45 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
   fprintf(f, "mov QWORD " TAPE_HEAD ", " TAPE_NAME "\n");
   fprintf(f, "mov QWORD " ARGS_HEAD ", " ARGS_NAME "\n");
   fprintf(f, "mov QWORD " RETS_HEAD ", " RETS_NAME "\n");
-  /* fprintf(f, "mov QWORD " GVARS_HEAD ", " GVARS_HEAD_NAME "\n"); */
   fprintf(f, "mov QWORD " LVARS_HEAD ", " LOCAL_VARS_NAME "\n");
 
 
-  gen_funcall(&gen, f, 0);
-  if (fns->items[0].rets.count == 0) fprintf(f, "mov rdi, 0\n");
+  gen_funcall(g, f, 0);
+  if (g->fns->items[0].rets.count == 0) fprintf(f, "mov rdi, 0\n");
   else fprintf(f, "pop rdi\n");
   fprintf(f, "mov rax, 60\n");
   
   fprintf(f, "syscall\n");
 
-  gen.r = 8;
-  gen.mask = R64_MAX;
-  gen.shift = 3;
+  g->r = 8;
+  g->mask = R64_MAX;
+  g->shift = 3;
 
-  for (size_t i = 0; i < gen.fns->count; i++) {
-    gen.fni = i;
-    gen.fn = gen.fns->items + i;
-    if (!gen_func(&gen, f)) return false;
+  for (size_t i = 0; i < g->fns->count; i++) {
+    g->fni = i;
+    g->fn = g->fns->items + i;
+    if (!gen_func(g, f)) return false;
   }
   
   fprintf(f, "segment readable writeable\n");
-  fprintf(f, TAPE_NAME " db %zu dup (0)\n", TAPE_SIZE);
+  fprintf(f, TAPE_NAME " db %zu dup (0)\n", g->tape_size);
   
-  fprintf(f, ARGS_NAME " db %zu dup (0)\n", ARG_STACK_SIZE);
-  fprintf(f, RETS_NAME " db %zu dup (0)\n", RET_STACK_SIZE);
-  fprintf(f, GLOBAL_VARS_NAME " db %zu dup (0)\n", GLOBAL_VAR_STACK_SIZE);
-  fprintf(f, LOCAL_VARS_NAME " db %zu dup (0)\n", LOCAL_VAR_STACK_SIZE);
+  fprintf(f, ARGS_NAME " db %zu dup (0)\n", g->arg_tape_size);
+  fprintf(f, RETS_NAME " db %zu dup (0)\n", g->ret_tape_size);
+  fprintf(f, GLOBAL_VARS_NAME " db %zu dup (0)\n", g->global_var_tape_size);
+  fprintf(f, LOCAL_VARS_NAME " db %zu dup (0)\n", g->local_var_tape_size);
 
   fprintf(f, TAPE_HEAD_NAME " dq 0\n");
   
   fprintf(f, ARGS_HEAD_NAME " dq 0\n");
   fprintf(f, RETS_HEAD_NAME " dq 0\n");
-  /* fprintf(f, GVARS_HEAD_NAME " dq 0\n"); */
   fprintf(f, LVARS_HEAD_NAME " dq 0\n");
 
   fprintf(f, "segment readable\n");
-  /* if (longs.count > 0) fprintf(f, "segment readable\n"); */
-  for (size_t i = 0; i < longs.count; i++) {
-    fprintf(f, "long_imm_%zu dq %zu\n", i, longs.items[i]);
+  for (size_t i = 0; i < g->longs->count; i++) {
+    fprintf(f, "long_imm_%zu dq %zu\n", i, g->longs->items[i]);
   }
 
-  /* fprintf(f, "false dq 0\n"); */
   fprintf(f, "true dq 1\n");
 
   fclose(f);
@@ -206,9 +188,6 @@ TARE_DEF bool gen_fasm(Parser *p, const char *output) {
 #ifndef THOROUGH_TIMING
   printf("Successfully generated file %s\n", output);
 #endif // THOROUGH_TIMING
-
-  if (gen.longs->items) free(gen.longs->items);
-  if (gen.gotos->items) free(gen.gotos->items);
 
   return true;
 }
@@ -284,7 +263,7 @@ TARE_DEF bool gen_op(Generator *g, FILE *f) {
   case OP_HEAD: gen_head_op(f); break;
   case OP_BASE: gen_base_op(f); break;
   case OP_INDEX: gen_index_op(f); break;
-  case OP_LENGTH: gen_length_op(f); break;
+  case OP_LENGTH: gen_length_op(g, f); break;
     
   case OP_CONST: unimpl("OP_CONST"); break;
 
@@ -414,17 +393,14 @@ TARE_DEF void gen_conditional_op(Generator *g, FILE *f) {
   default: assert(false && "unreachable");
   }
 
-  /* fprintf(f, "jz addr_%zu\n", g->op->op); */
   fprintf(f, "jz addr_%zu_%zu\n", g->fni, g->op->op);
 }
 
 TARE_DEF void gen_goto_op(Generator *g, FILE *f) {
-  /* fprintf(f, "jmp addr_%zu\n", g->op->op); */
   fprintf(f, "jmp addr_%zu_%zu\n", g->fni, g->op->op);
 }
 
 TARE_DEF void gen_address_op(Generator *g, FILE *f) {
-  /* fprintf(f, "addr_%zu:\n", g->op->op); */
   fprintf(f, "addr_%zu_%zu:\n", g->fni, g->op->op);
 }
 
@@ -641,8 +617,8 @@ TARE_DEF void gen_index_op(FILE *f) {
 }
 
 // length: TAPE_SIZE
-TARE_DEF void gen_length_op(FILE *f) {
-  fprintf(f, "mov QWORD rax, %zu\n", TAPE_SIZE);
+TARE_DEF void gen_length_op(Generator *g, FILE *f) {
+  fprintf(f, "mov QWORD rax, %zu\n", g->tape_size);
   gen_push_to_ops(f);
 }
 

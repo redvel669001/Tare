@@ -37,6 +37,12 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 
 #include <time.h>
 
+#define TAPE_SIZE (size_t) 1024
+#define ARG_TAPE_SIZE (size_t) 1024
+#define RET_TAPE_SIZE (size_t) 1024
+#define GLOBAL_VAR_TAPE_SIZE (size_t) 1024
+#define LOCAL_VAR_TAPE_SIZE (size_t) 1024
+
 typedef struct {
   const char *path;
   const char *output;
@@ -80,11 +86,16 @@ int main(int argc, char **argv) {
     FLAG_TIME_PARSER,
     FLAG_TIME_CODEGEN,
     FLAG_TIME_FASM,
+    FLAG_TAPE_SIZE,
+    FLAG_ARG_TAPE_SIZE,
+    FLAG_RET_TAPE_SIZE,
+    FLAG_GLOBAL_VAR_TAPE_SIZE,
+    FLAG_LOCAL_VAR_TAPE_SIZE,
     FLAG_HELP,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the flags to match the new count.");
+  static_assert(FLAGS_COUNT == 13, "Flags count has been chagned. Please update the flags to match the new count.");
   
   Flag sim = {
     .name_short = "-s", .name_long = "--simulate",
@@ -114,12 +125,42 @@ int main(int argc, char **argv) {
     .name_short = "-tf", .name_long = "--time-fasm",
     .description = "calculate the time for the assembler (fasm).",
   };
+  Flag tape_size = {
+    .name_short = "-ts", .name_long = "--tape-size",
+    .description = "specify the size of the tape (in bytes).",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = TAPE_SIZE,
+  };
+  Flag arg_tape_size = {
+    .name_short = "-ats", .name_long = "--arg-tape-size",
+    .description = "specify the size of the function argument tape in bytes.",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = ARG_TAPE_SIZE,
+  };
+  Flag ret_tape_size = {
+    .name_short = "-rts", .name_long = "--ret-tape-size",
+    .description = "specify the size of the return value tape in bytes.",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = RET_TAPE_SIZE,
+  };
+  Flag global_var_tape_size = {
+    .name_short = "-gvts", .name_long = "--global-var-tape-size",
+    .description = "specify the size of the global variable tape in bytes.",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = GLOBAL_VAR_TAPE_SIZE,
+  };
+  Flag local_var_tape_size = {
+    .name_short = "-lvts", .name_long = "--local-var-tape-size",
+    .description = "specify the size of the local variable tape in bytes.",
+    .type = FLAG_TYPE_U64,
+    .default_value.u64 = LOCAL_VAR_TAPE_SIZE,
+  };
   Flag help = {
     .name_short = "-h", .name_long = "--help",
     .description = "present this infromation.",
   };
 
-  static_assert(FLAGS_COUNT == 8, "Flags count has been chagned. Please update the array to match the new count.");
+  static_assert(FLAGS_COUNT == 13, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_SIMULATE] = &sim,
     [FLAG_COMPILE_FASM] = &comp,
@@ -127,12 +168,22 @@ int main(int argc, char **argv) {
     [FLAG_TIME_TOKENIZER] = &time_tokenization,
     [FLAG_TIME_PARSER] = &time_parsing,
     [FLAG_TIME_CODEGEN] = &time_codegen,
+    [FLAG_TAPE_SIZE] = &tape_size,
+    [FLAG_ARG_TAPE_SIZE] = &arg_tape_size,
+    [FLAG_RET_TAPE_SIZE] = &ret_tape_size,
+    [FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
+    [FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
     [FLAG_TIME_FASM] = &time_fasm,
     [FLAG_HELP] = &help,
   };
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
-  parse_flags(argc, (const char**) argv, &flags);
+  Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
+  if (!parse_flags(&args, &flags)) {
+    fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
+    print_usage(stderr, program, "<input> ", flags);
+    return 1;
+  }
 
   if (argc < 1) {
     fprintf(stderr, "Error: input `tare` file not provided!\n");
@@ -140,13 +191,13 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  if (help.on) {
+  if (help.value.on) {
     print_usage(stdout, program, "<input> ", flags);
     return 0;
   }
 
-  if (run.on) comp.on = true;
-  if (comp.on) sim.on = false;
+  if (run.value.on) comp.value.on = true;
+  if (comp.value.on) sim.value.on = false;
 
   size_t path_len = strlen(path_plain);
   if (!append_sv_to_string(&prog, src)) return 1;
@@ -174,7 +225,7 @@ int main(int argc, char **argv) {
     if (!tokenize_file(paths.path, &t)) return 1;
     size_t end = get_current_time();
 #ifdef THOROUGH_TIMING
-    if (time_tokenization.on) {
+    if (time_tokenization.value.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
       tokenization_timer.total += current_action_time;
@@ -182,18 +233,18 @@ int main(int argc, char **argv) {
       if (current_action_time < tokenization_timer.best) tokenization_timer.best = current_action_time;
     }
 #else
-    if (time_tokenization.on) print_elapsed_time(start, end, "Tokenization");
+    if (time_tokenization.value.on) print_elapsed_time(start, end, "Tokenization");
 #endif // THOROUGH_TIMING
   
     Functions funcs = {0};
     Longs gotos = {0};
     Vars globals = {0};
     Parser p = {.t = &t, .funcs = &funcs, .gotos = &gotos, .globals = &globals};
-    if (time_parsing.on) start = get_current_time();
+    if (time_parsing.value.on) start = get_current_time();
     if (!parse_file(&p)) return 1;
-    if (time_parsing.on) end = get_current_time();
+    if (time_parsing.value.on) end = get_current_time();
 #ifdef THOROUGH_TIMING
-    if (time_parsing.on) {
+    if (time_parsing.value.on) {
       current_action_time = ((double) end - start) / 1000000000;
       
       parsing_timer.total += current_action_time;
@@ -201,19 +252,63 @@ int main(int argc, char **argv) {
       if (current_action_time < parsing_timer.best) parsing_timer.best = current_action_time;
     }
 #else
-    if (time_parsing.on) print_elapsed_time(start, end, "Parsing");
+    if (time_parsing.value.on) print_elapsed_time(start, end, "Parsing");
 #endif // THOROUGH_TIMING
 
     Cmd cmd = {0};
 
-    if (sim.on) ret = sim_tare(&p);
-    else {
+    if (sim.value.on) {
+      Tape tape = {0};
+      init_tape(&tape, tape_size.value.u64);
+      Tape args_sim = {0};
+      init_tape(&args_sim, arg_tape_size.value.u64);
+      Tape rets = {0};
+      init_tape(&rets, ret_tape_size.value.u64);
+      Tape globals_sim = {0};
+      init_tape(&globals_sim, global_var_tape_size.value.u64);
+      Tape locals = {0};
+      init_tape(&locals, local_var_tape_size.value.u64);
+      Longs stack = {0};
+      Vids vids = {0};
 
-      if (time_codegen.on) start = get_current_time();
-      if (!gen_fasm(&p, paths.output)) return 1;
-      if (time_codegen.on) end = get_current_time();
+      Simulator simulator = {
+        .tape = &tape, .r = 8, .p = &p,
+        .args = &args_sim, .rets = &rets,
+        .globals = &globals_sim, .locals = &locals,
+        .stack = &stack, .global_vars = p.globals,
+        .vids = &vids, .fns = p.funcs,
+      };
+
+      ret = sim_tare(&simulator);
+
+      if (tape.items) free(tape.items);
+      if (args_sim.items) free(args_sim.items);
+      if (rets.items) free(rets.items);
+      if (globals_sim.items) free(globals_sim.items);
+      if (locals.items) free(locals.items);
+      if (stack.items) free(stack.items);
+      if (vids.items) free(vids.items);
+      if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
+    } else {
+      Longs longs = {0};
+      Generator gen = {
+        .longs = &longs, .t = &t,
+        .fn = funcs.items, .op = funcs.items->items,
+        .fns = &funcs,
+        .globals = p.globals,
+        .tape_size = tape_size.value.u64,
+        .arg_tape_size = arg_tape_size.value.u64,
+        .ret_tape_size = ret_tape_size.value.u64,
+        .global_var_tape_size = global_var_tape_size.value.u64,
+        .local_var_tape_size = local_var_tape_size.value.u64,
+      };
+      if (time_codegen.value.on) start = get_current_time();
+      if (!gen_fasm(paths.output, &gen)) return 1;
+      if (time_codegen.value.on) end = get_current_time();
+      if (longs.items) free(longs.items);
+      /* if (gotos.items) free(gotos.items); */
 #ifdef THOROUGH_TIMING
-      if (time_codegen.on) {
+      if (time_codegen.value.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
         codegen_timer.total += current_action_time;
@@ -221,7 +316,7 @@ int main(int argc, char **argv) {
         if (current_action_time < codegen_timer.best) codegen_timer.best = current_action_time;
       }
 #else
-      if (time_codegen.on) print_elapsed_time(start, end, "Codegen");
+      if (time_codegen.value.on) print_elapsed_time(start, end, "Codegen");
 #endif // THOROUGH_TIMING
 
       /* #ifndef THOROUGH_TIMING */
@@ -238,14 +333,14 @@ int main(int argc, char **argv) {
       bool display = true;
 #endif // THOROUGH_TIMING
 
-      if (time_fasm.on) start = get_current_time();
+      if (time_fasm.value.on) start = get_current_time();
       cmd_append(&cmd, "fasm", paths.fasm_input);
       if (!run_cmd(&cmd, redirect, display)) return 1;
-      if (time_fasm.on) end = get_current_time();
+      if (time_fasm.value.on) end = get_current_time();
 
       if (logs) fclose(logs);
 #ifdef THOROUGH_TIMING
-      if (time_fasm.on) {
+      if (time_fasm.value.on) {
         current_action_time = ((double) end - start) / 1000000000;
       
         fasm_timer.total += current_action_time;
@@ -253,13 +348,13 @@ int main(int argc, char **argv) {
         if (current_action_time < fasm_timer.best) fasm_timer.best = current_action_time;
       }
 #else
-      if (time_fasm.on) print_elapsed_time(start, end, "Fasm");
+      if (time_fasm.value.on) print_elapsed_time(start, end, "Fasm");
 #endif // THOROUGH_TIMING
 
       redirect.fdout = NULL;
       cmd_append(&cmd, "chmod", "+x", paths.output_bin);
       if (!run_cmd(&cmd, redirect, display)) return 1;
-      if (run.on) {
+      if (run.value.on) {
         cmd_append(&cmd, paths.output_bin);
         if (!run_cmd(&cmd, redirect, display)) return 1;
       }

@@ -119,9 +119,14 @@ int main(int argc, char **argv) {
   };
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
-  parse_flags(argc, (const char**) argv, &flags);
+  Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
+  if (!parse_flags(&args, &flags)) {
+    fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
+    print_usage(stderr, program, "", flags);
+    return 1;
+  }
 
-  if (help.on) {
+  if (help.value.on) {
     print_usage(stdout, program, "", flags);
     return 0;
   }
@@ -148,7 +153,7 @@ int main(int argc, char **argv) {
     cmd_append(&cmd, "./tare", paths.path);
     for (size_t j = 0; j < flags.count; j++) {
       Flag *flag = flags.items[j];
-      if (flag->on) cmd_append(&cmd, flag->name_short);
+      if (flag->value.on) cmd_append(&cmd, flag->name_short);
     }
     if (!run_cmd(&cmd, redirect, true)) return 1;
     putchar(10);

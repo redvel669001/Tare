@@ -47,7 +47,7 @@ typedef struct {
   Vids *vids;
 } Simulator;
 
-TARE_DEF int sim_tare(Parser *p);
+TARE_DEF int sim_tare(Simulator *sim);
 
 TARE_DEF bool sim_func(Simulator *sim);
 TARE_DEF bool sim_op(Simulator *sim);
@@ -66,54 +66,26 @@ TARE_DEF void init_tape(Tape *tape, size_t tape_size);
 
 #ifdef SIMULATOR_IMPLEMENTATION
 
-TARE_DEF int sim_tare(Parser *p) {
-  if (p == NULL) return -1;
+TARE_DEF int sim_tare(Simulator *sim) {
+  if (sim == NULL) return -1;
 
-  Tape tape = {0};
-  init_tape(&tape, TAPE_SIZE);
-  Tape args = {0};
-  init_tape(&args, ARG_STACK_SIZE);
-  Tape rets = {0};
-  init_tape(&rets, RET_STACK_SIZE);
-  Tape globals = {0};
-  init_tape(&globals, GLOBAL_VAR_STACK_SIZE);
-  Tape locals = {0};
-  init_tape(&locals, LOCAL_VAR_STACK_SIZE);
-  Longs stack = {0};
-  Vids vids = {0};
-  
-  Simulator sim = { .tape = &tape, .r = 8, .p = p,
-                    .args = &args, .rets = &rets,
-                    .globals = &globals, .locals = &locals,
-                    .stack = &stack, .global_vars = p->globals,
-                    .vids = &vids, .fns = p->funcs, };
-  
-  if (!sim_funcall(&sim, 0)) return -1;
+  if (!sim_funcall(sim, 0)) return -1;
   
   int ret = 0;
 
-  if (sim.fni != 0) return -1;
-  if (stack.count > 0) {
-    ret = (int) stack.items[--stack.count];
+  if (sim->fni != 0) return -1;
+  if (sim->stack->count > 0) {
+    ret = (int) sim->stack->items[--sim->stack->count];
   }
   putchar(10);
 
 
-  for (size_t i = 0; i < stack.count; i++) {
-    size_t num = stack.items[i];
+  for (size_t i = 0; i < sim->stack->count; i++) {
+    size_t num = sim->stack->items[i];
     printf("stack[%zu] = %zu\n", i, num);
   }
   
-  if (tape.items) free(tape.items);
-  if (args.items) free(args.items);
-  if (rets.items) free(rets.items);
-  if (globals.items) free(globals.items);
-  if (locals.items) free(locals.items);
-  if (stack.items) free(stack.items);
-  if (vids.items) free(vids.items);
-  if (sim.ret_addrs.items) free(sim.ret_addrs.items);
-  if (stack.count == 0) return ret;
-
+  if (sim->stack->count == 0) return ret;
   return -1;
 }
 

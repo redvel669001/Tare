@@ -104,19 +104,38 @@ int main(int argc, char **argv) {
          && "fix flags");
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
-  parse_flags(argc, (const char**) argv, &flags);
+  Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
+  if (!parse_flags(&args, &flags)) {
+    fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
+    print_usage(stderr, bin_path, "", flags);
+    return 1;
+  }
 
-  if (help.on) {
+  if (help.value.on) {
     print_usage(stdout, bin_path, "", flags);
     return 0;
   }
 
-  if (no_rebuild.on) rebuild.on = false;
+  if (no_rebuild.value.on) rebuild.value.on = false;
 
   Cmd cmd = {0};
   Redirect redirect = {0};
 
-  if ((needs_rebuild(bin_path, src_path) || rebuild.on) && !no_rebuild.on) {
+
+  enum {
+    COMP_SOURCE_PATH = 0,
+    COMP_SOURCE_CMD_H,
+    COMP_SOURCE_FLAGS_H,
+    COMP_SOURCES,
+  };
+
+  const char *comp_sources[] = { src_path, "./cmd.h", "flags.h", };
+  size_t comp_sources_count = sizeof(comp_sources)/sizeof(const char*);
+  assert(comp_sources_count == COMP_SOURCES);
+
+  bool should_rebuild =
+    needs_rebuild_multi(bin_path, comp_sources, comp_sources_count);
+  if ((should_rebuild || rebuild.value.on) && !no_rebuild.value.on) {
     // Is this really necessary?
     // Rename old binary for backup
     /* size_t old_bin_path_len = snprintf(NULL, 0, "%s.old", bin_path); */
@@ -131,17 +150,17 @@ int main(int argc, char **argv) {
 
     printf("Recompiling...\n");
     cmd_append(&cmd, "gcc", src_path, "-o", bin_path, CFLAGS);
-    if (fast.on) cmd_append(&cmd, "-Ofast");
-    if (werror.on) cmd_append(&cmd, "-Werror");
-    if (debug.on) cmd_append(&cmd, "-ggdb");
+    if (fast.value.on) cmd_append(&cmd, "-Ofast");
+    if (werror.value.on) cmd_append(&cmd, "-Werror");
+    if (debug.value.on) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
     
-    if (rebuild.on) rebuild.on = false;
-    no_rebuild.on = true;
+    if (rebuild.value.on) rebuild.value.on = false;
+    no_rebuild.value.on = true;
     cmd_append(&cmd, bin_path);
     for (size_t i = 0; i < flags.count; i++) {
       Flag *flag = flags.items[i];
-      if (flag->on) cmd_append(&cmd, flag->name_short);
+      if (flag->value.on) cmd_append(&cmd, flag->name_short);
     }
     if (!run_cmd(&cmd, redirect, true)) return 1;
     return 0;
@@ -191,20 +210,20 @@ int main(int argc, char **argv) {
     const char *source = sources[0];
     size_t sources_count = sources_counts[i];
     bool rebuild_program = needs_rebuild_multi(program, sources, sources_count);
-    if (!rebuild_program && !rebuild_rest.on) {
+    if (!rebuild_program && !rebuild_rest.value.on) {
       if (rebuild_program) printf("rebuild_program\n");
-      if (rebuild.on) printf("rebuild\n");
+      if (rebuild.value.on) printf("rebuild\n");
       continue;
     }
 
     cmd_append(&cmd, "gcc", source, "-o", program, CFLAGS);
-    if (fast.on) cmd_append(&cmd, "-Ofast");
-    if (werror.on) cmd_append(&cmd, "-Werror");
-    if (debug.on) cmd_append(&cmd, "-ggdb");
+    if (fast.value.on) cmd_append(&cmd, "-Ofast");
+    if (werror.value.on) cmd_append(&cmd, "-Werror");
+    if (debug.value.on) cmd_append(&cmd, "-ggdb");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
 
-  if (test.on) {
+  if (test.value.on) {
     enum {
       EXAMPLE_BASE = 0,
       EXAMPLE_TEST,
@@ -265,14 +284,14 @@ int main(int argc, char **argv) {
     };
 
     for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
-      if (profile.on) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
+      if (profile.value.on) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
       cmd_append(&cmd, "./tare", examples[i]);
       if (!run_cmd(&cmd, redirect, true)) return 1;
     }
   } else {
-    // Temporary, for testing the WIP parser.
-    cmd_append(&cmd, "./tare", "./examples/recursion.tare");
-    if (profile.on) cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
+    if (profile.value.on)
+      cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
+    cmd_append(&cmd, "./tare", "./examples/fib.tare", "-h");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
   
