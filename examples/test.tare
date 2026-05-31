@@ -1,30 +1,30 @@
 func main: {
   // r8 // work with characters
-  a(72); // set the first character to H
+  a(72); // set the current character to H
   n(); // move to the next character
-  a(101); // set the first character to e
+  a(101); // set the current character to e
   n(); // move to the next character
-  a(108); // set the first character to l
+  a(108); // set the current character to l
   n(); // move to the next character
-  a(108); // set the first character to l
+  a(108); // set the current character to l
   n(); // move to the next character
-  a(111); // set the first character to o
+  a(111); // set the current character to o
   n(); // move to the next character
-  a(44); // set the first character to ,
+  a(44); // set the current character to ,
   n(); // move to the next character
-  a(32); // set the first character to a space
+  a(32); // set the current character to a space
   n(); // move to the next character
-  a(116); // set the first character to t
+  a(116); // set the current character to t
   n(); // move to the next character
-  a(97); // set the first character to a
+  a(97); // set the current character to a
   n(); // move to the next character
-  a(114); // set the first character to r
+  a(114); // set the current character to r
   n(); // move to the next character
-  a(101); // set the first character to e
+  a(101); // set the current character to e
   n(); // move to the next character
-  a(33); // set the first character to an exclamation mark
+  a(33); // set the current character to an exclamation mark
   n(); // move to the next character
-  a(10); // set the first character to a new line
+  a(10); // set the current character to a new line
   write(base, 13); // print from the beginning
   ret;
 }
