@@ -126,8 +126,9 @@ TARE_DEF bool sim_op(Simulator *sim) {
     {
       if (stack->count < 1) return false;
       size_t first = stack->items[--stack->count];
-      if (op->type == OP_PTR_ADD) tape->head += (first * sim->r);
-      else if (op->type == OP_PTR_SUB) tape->head -= (first * sim->r);
+      if ((op - 1)->type != OP_INDEX) first *= sim->r;
+      if (op->type == OP_PTR_ADD) tape->head += first;
+      else if (op->type == OP_PTR_SUB) tape->head -= first;
       else assert(false && "unreachable");
     }
     break;
