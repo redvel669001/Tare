@@ -200,9 +200,9 @@ TARE_DEF bool sim_op(Simulator *sim) {
         result = syscall(args[0], args[1], args[2], args[3], args[4],
                          args[5], args[6]);
       }
-      if (result == ENOSYS) {
-        diag_errf(t, t->t, "syscall number %zu has not been implemented!\n",
-                  args[0]);
+      if (result == -1) {
+        diag_errf(t, t->t, "%s\n", strerror(errno));
+        return false;
       }
     }
     break;
