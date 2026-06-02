@@ -59,6 +59,27 @@ typedef struct {
   double worst;
 } ThoroughTimer;
 
+typedef enum {
+  TARE_FLAG_SIMULATE = 0,
+  TARE_FLAG_COMPILE_FASM,
+  TARE_FLAG_DUMP_ASSEMBLY,
+  TARE_FLAG_RUN,
+  TARE_FLAG_TIME_TOKENIZER,
+  TARE_FLAG_TIME_PARSER,
+  TARE_FLAG_TIME_CODEGEN,
+  TARE_FLAG_TIME_FASM,
+  TARE_FLAG_TIME_SIMULATOR,
+  TARE_FLAG_TIME_THOROUGHLY,
+  TARE_FLAG_TAPE_SIZE,
+  TARE_FLAG_ARG_TAPE_SIZE,
+  TARE_FLAG_RET_TAPE_SIZE,
+  TARE_FLAG_GLOBAL_VAR_TAPE_SIZE,
+  TARE_FLAG_LOCAL_VAR_TAPE_SIZE,
+  TARE_FLAG_HELP,
+  TARE_FLAGS_COUNT,
+} TareFlag;
+static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
+
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
 TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
 
@@ -117,6 +138,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) 
   printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
 }
 
+static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   int ret = 0;
   ThoroughTimer tokenization_timer = { .best = 1 };
@@ -125,42 +147,20 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   ThoroughTimer fasm_timer         = { .best = 1 };
   ThoroughTimer sim_timer          = { .best = 1 };
 
-  enum {
-    FLAG_SIMULATE = 0,
-    FLAG_COMPILE_FASM,
-    FLAG_RUN,
-    FLAG_TIME_TOKENIZER,
-    FLAG_TIME_PARSER,
-    FLAG_TIME_CODEGEN,
-    FLAG_TIME_FASM,
-    FLAG_TIME_SIMULATOR,
-    FLAG_TIME_THOROUGHLY,
-    FLAG_TAPE_SIZE,
-    FLAG_ARG_TAPE_SIZE,
-    FLAG_RET_TAPE_SIZE,
-    FLAG_GLOBAL_VAR_TAPE_SIZE,
-    FLAG_LOCAL_VAR_TAPE_SIZE,
-    FLAG_HELP,
-    FLAGS_COUNT,
-  };
-
-  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the array to match the new count.");
-  if (flags.count != FLAGS_COUNT) return 1;
-
-  Flag sim                  = *flags.items[FLAG_SIMULATE];
-  Flag comp                 = *flags.items[FLAG_COMPILE_FASM];
-  Flag run                  = *flags.items[FLAG_RUN];
-  Flag time_tokenization    = *flags.items[FLAG_TIME_TOKENIZER];
-  Flag time_parsing         = *flags.items[FLAG_TIME_PARSER];
-  Flag time_codegen         = *flags.items[FLAG_TIME_CODEGEN];
-  Flag time_fasm            = *flags.items[FLAG_TIME_FASM];
-  Flag time_simulator       = *flags.items[FLAG_TIME_SIMULATOR];
-  Flag time_thoroughly      = *flags.items[FLAG_TIME_THOROUGHLY];
-  Flag tape_size            = *flags.items[FLAG_TAPE_SIZE];
-  Flag arg_tape_size        = *flags.items[FLAG_ARG_TAPE_SIZE];
-  Flag ret_tape_size        = *flags.items[FLAG_RET_TAPE_SIZE];
-  Flag global_var_tape_size = *flags.items[FLAG_GLOBAL_VAR_TAPE_SIZE];
-  Flag local_var_tape_size  = *flags.items[FLAG_LOCAL_VAR_TAPE_SIZE];
+  Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
+  Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
+  Flag run                  = *flags.items[TARE_FLAG_RUN];
+  Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
+  Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
+  Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
+  Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
+  Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
+  Flag time_thoroughly      = *flags.items[TARE_FLAG_TIME_THOROUGHLY];
+  Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
+  Flag arg_tape_size        = *flags.items[TARE_FLAG_ARG_TAPE_SIZE];
+  Flag ret_tape_size        = *flags.items[TARE_FLAG_RET_TAPE_SIZE];
+  Flag global_var_tape_size = *flags.items[TARE_FLAG_GLOBAL_VAR_TAPE_SIZE];
+  Flag local_var_tape_size  = *flags.items[TARE_FLAG_LOCAL_VAR_TAPE_SIZE];
 
   Cmd cmd = {0};
 
@@ -297,44 +297,23 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   return ret;
 }
 
+static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
   int ret = 0;
 
-  enum {
-    FLAG_SIMULATE = 0,
-    FLAG_COMPILE_FASM,
-    FLAG_RUN,
-    FLAG_TIME_TOKENIZER,
-    FLAG_TIME_PARSER,
-    FLAG_TIME_CODEGEN,
-    FLAG_TIME_FASM,
-    FLAG_TIME_SIMULATOR,
-    FLAG_TIME_THOROUGHLY,
-    FLAG_TAPE_SIZE,
-    FLAG_ARG_TAPE_SIZE,
-    FLAG_RET_TAPE_SIZE,
-    FLAG_GLOBAL_VAR_TAPE_SIZE,
-    FLAG_LOCAL_VAR_TAPE_SIZE,
-    FLAG_HELP,
-    FLAGS_COUNT,
-  };
-
-  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the array to match the new count.");
-  if (flags.count != FLAGS_COUNT) return 1;
-
-  Flag sim                  = *flags.items[FLAG_SIMULATE];
-  Flag comp                 = *flags.items[FLAG_COMPILE_FASM];
-  Flag run                  = *flags.items[FLAG_RUN];
-  Flag time_tokenization    = *flags.items[FLAG_TIME_TOKENIZER];
-  Flag time_parsing         = *flags.items[FLAG_TIME_PARSER];
-  Flag time_codegen         = *flags.items[FLAG_TIME_CODEGEN];
-  Flag time_fasm            = *flags.items[FLAG_TIME_FASM];
-  Flag time_simulator       = *flags.items[FLAG_TIME_SIMULATOR];
-  Flag tape_size            = *flags.items[FLAG_TAPE_SIZE];
-  Flag arg_tape_size        = *flags.items[FLAG_ARG_TAPE_SIZE];
-  Flag ret_tape_size        = *flags.items[FLAG_RET_TAPE_SIZE];
-  Flag global_var_tape_size = *flags.items[FLAG_GLOBAL_VAR_TAPE_SIZE];
-  Flag local_var_tape_size  = *flags.items[FLAG_LOCAL_VAR_TAPE_SIZE];
+  Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
+  Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
+  Flag run                  = *flags.items[TARE_FLAG_RUN];
+  Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
+  Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
+  Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
+  Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
+  Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
+  Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
+  Flag arg_tape_size        = *flags.items[TARE_FLAG_ARG_TAPE_SIZE];
+  Flag ret_tape_size        = *flags.items[TARE_FLAG_RET_TAPE_SIZE];
+  Flag global_var_tape_size = *flags.items[TARE_FLAG_GLOBAL_VAR_TAPE_SIZE];
+  Flag local_var_tape_size  = *flags.items[TARE_FLAG_LOCAL_VAR_TAPE_SIZE];
 
   Tokenizer t = {0};
   size_t start = get_current_time();

@@ -15,27 +15,6 @@ int main(int argc, char **argv) {
   
   const char *path_plain = *argv;
 
-  enum {
-    FLAG_SIMULATE = 0,
-    FLAG_COMPILE_FASM,
-    FLAG_RUN,
-    FLAG_TIME_TOKENIZER,
-    FLAG_TIME_PARSER,
-    FLAG_TIME_CODEGEN,
-    FLAG_TIME_FASM,
-    FLAG_TIME_SIMULATOR,
-    FLAG_TIME_THOROUGHLY,
-    FLAG_TAPE_SIZE,
-    FLAG_ARG_TAPE_SIZE,
-    FLAG_RET_TAPE_SIZE,
-    FLAG_GLOBAL_VAR_TAPE_SIZE,
-    FLAG_LOCAL_VAR_TAPE_SIZE,
-    FLAG_HELP,
-    FLAGS_COUNT,
-  };
-
-  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the flags to match the new count.");
-  
   Flag sim = {
     .name_short = "-s", .name_long = "--simulate",
     .description = "invoke an interpreter instead of a compiler.",
@@ -44,6 +23,10 @@ int main(int argc, char **argv) {
     .name_short = "-c", .name_long = "--compile",
     .description = "compile a native executable.",
     .default_value.on = true,
+  };
+  Flag dump_asm = {
+    .name_short = "-da", .name_long = "--dump-assembly",
+    .description = "translate to assembly (fasm) but do not assemble.",
   };
   Flag run = {
     .name_short = "-r", .name_long = "--run",
@@ -110,26 +93,27 @@ int main(int argc, char **argv) {
     .description = "present this infromation.",
   };
 
-  static_assert(FLAGS_COUNT == 15, "Flags count has been chagned. Please update the array to match the new count.");
-  Flag *flag_array[FLAGS_COUNT] = {
-    [FLAG_SIMULATE] = &sim,
-    [FLAG_COMPILE_FASM] = &comp,
-    [FLAG_RUN] = &run,
-    [FLAG_TIME_TOKENIZER] = &time_tokenization,
-    [FLAG_TIME_PARSER] = &time_parsing,
-    [FLAG_TIME_CODEGEN] = &time_codegen,
-    [FLAG_TIME_FASM] = &time_fasm,
-    [FLAG_TIME_SIMULATOR] = &time_simulator,
-    [FLAG_TIME_THOROUGHLY] = &time_thoroughly,
-    [FLAG_TAPE_SIZE] = &tape_size,
-    [FLAG_ARG_TAPE_SIZE] = &arg_tape_size,
-    [FLAG_RET_TAPE_SIZE] = &ret_tape_size,
-    [FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
-    [FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
-    [FLAG_HELP] = &help,
+  static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the array to match the new count.");
+  Flag *flag_array[TARE_FLAGS_COUNT] = {
+    [TARE_FLAG_SIMULATE] = &sim,
+    [TARE_FLAG_COMPILE_FASM] = &comp,
+    [TARE_FLAG_DUMP_ASSEMBLY] = &dump_asm,
+    [TARE_FLAG_RUN] = &run,
+    [TARE_FLAG_TIME_TOKENIZER] = &time_tokenization,
+    [TARE_FLAG_TIME_PARSER] = &time_parsing,
+    [TARE_FLAG_TIME_CODEGEN] = &time_codegen,
+    [TARE_FLAG_TIME_FASM] = &time_fasm,
+    [TARE_FLAG_TIME_SIMULATOR] = &time_simulator,
+    [TARE_FLAG_TIME_THOROUGHLY] = &time_thoroughly,
+    [TARE_FLAG_TAPE_SIZE] = &tape_size,
+    [TARE_FLAG_ARG_TAPE_SIZE] = &arg_tape_size,
+    [TARE_FLAG_RET_TAPE_SIZE] = &ret_tape_size,
+    [TARE_FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
+    [TARE_FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
+    [TARE_FLAG_HELP] = &help,
   };
 
-  Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
+  Flags flags = { .items = flag_array, .count = TARE_FLAGS_COUNT, };
   Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
   if (!parse_flags(&args, &flags)) {
     fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
@@ -148,8 +132,13 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (sim.value.on) comp.value.on = false;
+  if (sim.value.on || dump_asm.value.on) comp.value.on = false;
+  if (dump_asm.value.on) sim.value.on = false;
   if (!comp.value.on) run.value.on = false;
+
+  if (!comp.value.on && !dump_asm.value.on) time_codegen.value.on = false;
+  if (!comp.value.on) time_fasm.value.on = false;
+  if (!sim.value.on) time_simulator.value.on = false;
 
   if (time_thoroughly.parsed) {
     time_tokenization.value.on = true;
