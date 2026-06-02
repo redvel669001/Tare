@@ -1,23 +1,5 @@
-#define CMD_IMPLEMENTATION
-#include "cmd.h"
-
-#define STR_IMPLEMENTATION
-#include "str.h"
-
-#define FLAGS_IMPLEMENTATION
-#include "flags.h"
-
-typedef struct {
-  const char *path;
-  const char *output;
-  const char *fasm_input;
-  const char *output_bin;
-  String arena;
-  StringView src;
-} Paths;
-
-TARE_DEF size_t find_final_dot(const char *str, size_t len);
-TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
+#define COMPILER_IMPLEMENTATION
+#include "compiler.h"
 
 typedef enum {
   EXAMPLE_BASE = 0,
@@ -85,43 +67,26 @@ int main(int argc, char **argv) {
   argv++;
 
   enum {
-    FLAG_SIMULATE = 0,
-    FLAG_COMPILE_FASM,
-    FLAG_RUN,
-    FLAG_HELP,
+    FLAG_HELP = 0,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 4, "Flags count has been chagned. Please update the flags to match the new count.");
-  Flag sim = {
-    .name_short = "-s", .name_long = "--simulate",
-    .description = "invoke an interpreter instead of a compiler.",
-  };
-  Flag comp = {
-    .name_short = "-c", .name_long = "--compile",
-    .description = "compile a native executable.",
-  };
-  Flag run = {
-    .name_short = "-r", .name_long = "--run",
-    .description = "compile and run a native executable.",
-  };
+  static_assert(FLAGS_COUNT == 1, "Flags count has been chagned. Please update the flags to match the new count.");
   Flag help = {
     .name_short = "-h", .name_long = "--help",
     .description = "present this infromation.",
   };
 
-  static_assert(FLAGS_COUNT == 4, "Flags count has been chagned. Please update the array to match the new count.");
+  static_assert(FLAGS_COUNT == 1, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
-    [FLAG_SIMULATE] = &sim,
-    [FLAG_COMPILE_FASM] = &comp,
-    [FLAG_RUN] = &run,
     [FLAG_HELP] = &help,
   };
 
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
   if (!parse_flags(&args, &flags)) {
-    fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
+    if (args.arg != NULL)
+      fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
     print_usage(stderr, program, "", flags);
     return 1;
   }
@@ -141,61 +106,29 @@ int main(int argc, char **argv) {
     if (!paths_from_tare(examples[i], paths, build)) return 1;
   }
 
-  /* printf("Testing %d tare files...\n\n", EXAMPLES_COUNT); */
-
   Cmd cmd = {0};
   Redirect redirect = {0};
   for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
     if (i == EXAMPLE_FUNC || i == EXAMPLE_READ) continue;
     Paths paths = examples_paths[i];
-
     printf("--------------------------------------------------\n");
+    printf("%s\n", paths.path);
     cmd_append(&cmd, "./tare", paths.path);
-    for (size_t j = 0; j < flags.count; j++) {
-      Flag *flag = flags.items[j];
-      if (flag->value.on) cmd_append(&cmd, flag->name_short);
+    for (int j = 0; j < argc; j++) {
+      cmd_append(&cmd, argv[j]);
     }
     if (!run_cmd(&cmd, redirect, true)) return 1;
     putchar(10);
     printf("--------------------------------------------------\n\n");
   }
-  
+
   if (cmd.items) free(cmd.items);
 
   for(size_t i = 0; i < EXAMPLES_COUNT; i++) {
     Paths paths = examples_paths[i];
     if (paths.arena.items) free(paths.arena.items);
   }
-  
+
   return 0;
-}
-
-TARE_DEF size_t find_final_dot(const char *str, size_t len) {
-  size_t result = 0;
-  for (size_t i = 0; i < len; i++) if (str[i] == '.') result = i;
-  return result;
-}
-
-TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build) {
-  ps->path = p;
-  const char *path = p + ps->src.l;
-  size_t final_dot = find_final_dot(p, strlen(p)) - ps->src.l;
-  
-  if (final_dot == 0) return false;
-  if (!append_to_string(&ps->arena, "./", 2)) return false;
-  ps->fasm_input = ps->arena.items + ps->arena.count;
-  ps->output = ps->arena.items + ps->arena.count;
-  if (!append_to_string(&ps->arena, build.s, build.l)) return false;
-  if (!append_to_string(&ps->arena, path, final_dot)) return false;
-  if (!append_to_string(&ps->arena, ".s", 2)) return false;
-  da_append(&ps->arena, 0);
-  
-  ps->output_bin = ps->arena.items + ps->arena.count;
-  if (!append_to_string(&ps->arena, "./", 2)) return false;
-  if (!append_to_string(&ps->arena, build.s, build.l)) return false;
-  if (!append_to_string(&ps->arena, path, final_dot)) return false;
-  da_append(&ps->arena, 0);
-
-  return true;
 }
 
