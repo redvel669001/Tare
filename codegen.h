@@ -123,7 +123,7 @@ TARE_DEF size_t find_long(Longs *longs, size_t op);
 
 TARE_DEF bool gen_fasm(const char *output, Generator *g) {
   if (output == NULL || g == NULL) return false;
-  
+
   Tokenizer *t = g->t;
   first_token(t);
 
@@ -144,12 +144,11 @@ TARE_DEF bool gen_fasm(const char *output, Generator *g) {
   fprintf(f, "mov QWORD " RETS_HEAD ", " RETS_NAME "\n");
   fprintf(f, "mov QWORD " LVARS_HEAD ", " LOCAL_VARS_NAME "\n");
 
-
   gen_funcall(g, f, 0);
   if (g->fns->items[0].rets.count == 0) fprintf(f, "mov rdi, 0\n");
   else fprintf(f, "pop rdi\n");
   fprintf(f, "mov rax, 60\n");
-  
+
   fprintf(f, "syscall\n");
 
   g->r = 8;
@@ -161,17 +160,17 @@ TARE_DEF bool gen_fasm(const char *output, Generator *g) {
     g->fn = g->fns->items + i;
     if (!gen_func(g, f)) return false;
   }
-  
+
   fprintf(f, "segment readable writeable\n");
   fprintf(f, TAPE_NAME " db %zu dup (0)\n", g->tape_size);
-  
+
   fprintf(f, ARGS_NAME " db %zu dup (0)\n", g->arg_tape_size);
   fprintf(f, RETS_NAME " db %zu dup (0)\n", g->ret_tape_size);
   fprintf(f, GLOBAL_VARS_NAME " db %zu dup (0)\n", g->global_var_tape_size);
   fprintf(f, LOCAL_VARS_NAME " db %zu dup (0)\n", g->local_var_tape_size);
 
   fprintf(f, TAPE_HEAD_NAME " dq 0\n");
-  
+
   fprintf(f, ARGS_HEAD_NAME " dq 0\n");
   fprintf(f, RETS_HEAD_NAME " dq 0\n");
   fprintf(f, LVARS_HEAD_NAME " dq 0\n");
@@ -185,9 +184,7 @@ TARE_DEF bool gen_fasm(const char *output, Generator *g) {
 
   fclose(f);
 
-#ifndef THOROUGH_TIMING
   printf("Successfully generated file %s\n", output);
-#endif // THOROUGH_TIMING
 
   return true;
 }
