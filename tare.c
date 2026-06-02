@@ -1,5 +1,5 @@
-#define COMPILER_IMPLEMENTATION
-#include "compiler.h"
+#define SHARED_IMPLEMENTATION
+#include "shared.h"
 
 TARE_DEF void str_to_tare_template(const char *string); // Testing thing
 
@@ -28,6 +28,10 @@ int main(int argc, char **argv) {
     .name_short = "-da", .name_long = "--dump-assembly",
     .description = "translate to assembly (fasm) but do not assemble.",
   };
+  Flag compile_binary = {
+    .name_short = "-b", .name_long = "--binary",
+    .description = "translate directly to binary rather than assembly (fasm).",
+  };
   Flag run = {
     .name_short = "-r", .name_long = "--run",
     .description = "compile and run a native executable.",
@@ -47,6 +51,10 @@ int main(int argc, char **argv) {
   Flag time_fasm = {
     .name_short = "-tf", .name_long = "--time-fasm",
     .description = "calculate the time for the assembler (fasm).",
+  };
+  Flag time_binary = {
+    .name_short = "-tb", .name_long = "--time-binary",
+    .description = "calculate the time for the binary translation (not fasm).",
   };
   Flag time_simulator = {
     .name_short = "-ts", .name_long = "--time-simulator",
@@ -93,16 +101,18 @@ int main(int argc, char **argv) {
     .description = "present this infromation.",
   };
 
-  static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the array to match the new count.");
+  static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[TARE_FLAGS_COUNT] = {
     [TARE_FLAG_SIMULATE] = &sim,
     [TARE_FLAG_COMPILE_FASM] = &comp,
     [TARE_FLAG_DUMP_ASSEMBLY] = &dump_asm,
+    [TARE_FLAG_COMPILE_BINARY] = &compile_binary,
     [TARE_FLAG_RUN] = &run,
     [TARE_FLAG_TIME_TOKENIZER] = &time_tokenization,
     [TARE_FLAG_TIME_PARSER] = &time_parsing,
     [TARE_FLAG_TIME_CODEGEN] = &time_codegen,
     [TARE_FLAG_TIME_FASM] = &time_fasm,
+    [TARE_FLAG_TIME_BINARY] = &time_binary,
     [TARE_FLAG_TIME_SIMULATOR] = &time_simulator,
     [TARE_FLAG_TIME_THOROUGHLY] = &time_thoroughly,
     [TARE_FLAG_TAPE_SIZE] = &tape_size,
@@ -132,18 +142,24 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (sim.value.on || dump_asm.value.on) comp.value.on = false;
-  if (dump_asm.value.on) sim.value.on = false;
+  if (sim.value.on || dump_asm.value.on
+      || compile_binary.value.on) comp.value.on = false;
+  if (dump_asm.value.on || compile_binary.value.on) sim.value.on = false;
+  if (compile_binary.value.on) dump_asm.value.on = false;
   if (!comp.value.on) run.value.on = false;
 
-  if (!comp.value.on && !dump_asm.value.on) time_codegen.value.on = false;
+  if (!comp.value.on && !dump_asm.value.on
+      && !compile_binary.value.on) time_codegen.value.on = false;
+  if (!compile_binary.value.on) time_binary.value.on = false;
   if (!comp.value.on) time_fasm.value.on = false;
   if (!sim.value.on) time_simulator.value.on = false;
 
   if (time_thoroughly.parsed) {
     time_tokenization.value.on = true;
     time_parsing.value.on = true;
-    if (comp.value.on) time_codegen.value.on = true;
+    if (comp.value.on || dump_asm.value.on
+        || compile_binary.value.on) time_codegen.value.on = true;
+    if (compile_binary.value.on) time_binary.value.on = true;
     if (run.value.on) time_fasm.value.on = true;
     if (sim.value.on) time_simulator.value.on = true;
   }

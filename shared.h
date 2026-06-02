@@ -1,5 +1,5 @@
-#ifndef COMPILER_H_
-#define COMPILER_H_
+#ifndef SHARED_H_
+#define SHARED_H_
 
 #define CMD_IMPLEMENTATION
 #include "cmd.h"
@@ -63,11 +63,13 @@ typedef enum {
   TARE_FLAG_SIMULATE = 0,
   TARE_FLAG_COMPILE_FASM,
   TARE_FLAG_DUMP_ASSEMBLY,
+  TARE_FLAG_COMPILE_BINARY,
   TARE_FLAG_RUN,
   TARE_FLAG_TIME_TOKENIZER,
   TARE_FLAG_TIME_PARSER,
   TARE_FLAG_TIME_CODEGEN,
   TARE_FLAG_TIME_FASM,
+  TARE_FLAG_TIME_BINARY,
   TARE_FLAG_TIME_SIMULATOR,
   TARE_FLAG_TIME_THOROUGHLY,
   TARE_FLAG_TAPE_SIZE,
@@ -78,7 +80,7 @@ typedef enum {
   TARE_FLAG_HELP,
   TARE_FLAGS_COUNT,
 } TareFlag;
-static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
 
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
 TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
@@ -91,9 +93,9 @@ TARE_DEF int comp_or_sim_once(Paths paths, Flags flags);
 TARE_DEF void time_current_action(ThoroughTimer *t, size_t start, size_t end);
 TARE_DEF void print_thorough_timer(ThoroughTimer timer, size_t count, const char *name);
 
-#endif // COMPILER_H_
+#endif // SHARED_H_
 
-#ifdef COMPILER_IMPLEMENTATION
+#ifdef SHARED_IMPLEMENTATION
 
 TARE_DEF bool check_bounds(size_t index, size_t count) {
   return index < count;
@@ -138,7 +140,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) 
   printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
 }
 
-static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   int ret = 0;
   ThoroughTimer tokenization_timer = { .best = 1 };
@@ -149,11 +151,13 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
 
   Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
   Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
+  Flag compile_binary       = *flags.items[TARE_FLAG_COMPILE_BINARY];
   Flag run                  = *flags.items[TARE_FLAG_RUN];
   Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
   Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
   Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
   Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
+  Flag time_binary          = *flags.items[TARE_FLAG_TIME_BINARY];
   Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
   Flag time_thoroughly      = *flags.items[TARE_FLAG_TIME_THOROUGHLY];
   Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
@@ -297,17 +301,19 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   return ret;
 }
 
-static_assert(TARE_FLAGS_COUNT == 16, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
   int ret = 0;
 
   Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
   Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
+  Flag compile_binary       = *flags.items[TARE_FLAG_COMPILE_BINARY];
   Flag run                  = *flags.items[TARE_FLAG_RUN];
   Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
   Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
   Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
   Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
+  Flag time_binary          = *flags.items[TARE_FLAG_TIME_BINARY];
   Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
   Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
   Flag arg_tape_size        = *flags.items[TARE_FLAG_ARG_TAPE_SIZE];
@@ -446,5 +452,5 @@ TARE_DEF void print_thorough_timer(ThoroughTimer timer, size_t count, const char
   printf("    Worst: %lf\n", timer.worst);
 }
 
-#endif // COMPILER_IMPLEMENTATION
+#endif // SHARED_IMPLEMENTATION
 

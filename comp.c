@@ -129,7 +129,11 @@ int main(int argc, char **argv) {
     COMP_SOURCES,
   };
 
-  const char *comp_sources[] = { src_path, "./cmd.h", "flags.h", };
+  const char *comp_sources[COMP_SOURCES] = {
+    [COMP_SOURCE_PATH] = src_path,
+    [COMP_SOURCE_CMD_H] = "./cmd.h",
+    [COMP_SOURCE_FLAGS_H] = "./flags.h",
+  };
   size_t comp_sources_count = sizeof(comp_sources)/sizeof(const char*);
   assert(comp_sources_count == COMP_SOURCES);
 
@@ -180,6 +184,7 @@ int main(int argc, char **argv) {
     TARE_SOURCE_SIMULATOR_H,
     TARE_SOURCE_STR_H,
     TARE_SOURCE_TOKENIZER_H,
+    TARE_SOURCE_SHARED_H,
     TARE_SOURCES,
   };
   
@@ -188,12 +193,31 @@ int main(int argc, char **argv) {
     TEST_SOURCE_CMD_H,
     TEST_SOURCE_STR_H,
     TEST_SOURCE_FLAGS_H,
+    TEST_SOURCE_SHARED_H,
     TEST_SOURCES,
   };
   
   static_assert(SOURCES_COUNT == PROGRAMS_COUNT);
-  const char *tare_sources[] = {"./tare.c", "./cmd.h", "codegen.h", "./da.h", "./flags.h", "./lexer.h", "./parser.h", "./simulator.h", "./str.h", "./tokenizer.h",};
-  const char *test_sources[] = {"./test.c", "./cmd.h", "./str.h", "flags.h",};
+  const char *tare_sources[TARE_SOURCES] = {
+    [TARE_SOURCE_TARE_C] = "./tare.c",
+    [TARE_SOURCE_CMD_H] = "./cmd.h",
+    [TARE_SOURCE_CODEGEN_H] = "codegen.h",
+    [TARE_SOURCE_DA_H] = "./da.h",
+    [TARE_SOURCE_FLAGS_H] = "./flags.h",
+    [TARE_SOURCE_LEXER_H] = "./lexer.h",
+    [TARE_SOURCE_PARSER_H] = "./parser.h",
+    [TARE_SOURCE_SIMULATOR_H] = "./simulator.h",
+    [TARE_SOURCE_STR_H] = "./str.h",
+    [TARE_SOURCE_TOKENIZER_H] = "./tokenizer.h",
+    [TARE_SOURCE_SHARED_H] = "./shared.h",
+  };
+  const char *test_sources[TEST_SOURCES] = {
+    [TEST_SOURCE_TEST_C] = "./test.c",
+    [TEST_SOURCE_CMD_H] = "./cmd.h",
+    [TEST_SOURCE_STR_H] = "./str.h",
+    [TEST_SOURCE_FLAGS_H] = "./flags.h",
+    [TEST_SOURCE_SHARED_H] = "./shared.h",
+  };
   size_t tare_sources_count = sizeof(tare_sources)/sizeof(const char*);
   size_t test_sources_count = sizeof(test_sources)/sizeof(const char*);
   assert(tare_sources_count == TARE_SOURCES);

@@ -1,5 +1,5 @@
-#define COMPILER_IMPLEMENTATION
-#include "compiler.h"
+#define SHARED_IMPLEMENTATION
+#include "shared.h"
 
 typedef enum {
   EXAMPLE_BASE = 0,
