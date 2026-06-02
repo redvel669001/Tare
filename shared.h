@@ -30,6 +30,9 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 #define CODEGEN_IMPLEMENTATION
 #include "codegen.h"
 
+#define BINGEN_IMPLEMENTATION
+#include "bingen.h"
+
 #define FLAGS_IMPLEMENTATION
 #include "flags.h"
 
@@ -222,41 +225,62 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
       if (vids.items) free(vids.items);
       if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
     } else {
-      Longs longs = {0};
-      Generator gen = {
-        .longs = &longs, .t = &t,
-        .fn = funcs.items, .op = funcs.items->items,
-        .fns = &funcs,
-        .globals = p.globals,
-        .tape_size = tape_size.value.u64,
-        .arg_tape_size = arg_tape_size.value.u64,
-        .ret_tape_size = ret_tape_size.value.u64,
-        .global_var_tape_size = global_var_tape_size.value.u64,
-        .local_var_tape_size = local_var_tape_size.value.u64,
-      };
-      if (time_codegen.value.on) start = get_current_time();
-      if (!gen_fasm(paths.output, &gen)) return 1;
-      if (time_codegen.value.on) end = get_current_time();
-      if (longs.items) free(longs.items);
-      if (time_codegen.value.on) time_current_action(&codegen_timer, start, end);
-
-      FILE *logs = fopen("logs.log", "w");
-      int logs_fd = fileno(logs);
-      Redirect redirect = {.fdout = &logs_fd};
+      Redirect redirect = {0};
       bool display = false;
 
-      if (time_fasm.value.on) start = get_current_time();
       if (comp.value.on) {
+        Longs longs = {0};
+        Generator gen = {
+          .longs = &longs, .t = &t,
+          .fn = funcs.items, .op = funcs.items->items,
+          .fns = &funcs,
+          .globals = p.globals,
+          .tape_size = tape_size.value.u64,
+          .arg_tape_size = arg_tape_size.value.u64,
+          .ret_tape_size = ret_tape_size.value.u64,
+          .global_var_tape_size = global_var_tape_size.value.u64,
+          .local_var_tape_size = local_var_tape_size.value.u64,
+        };
+        if (time_codegen.value.on) start = get_current_time();
+        if (!gen_fasm(paths.output, &gen)) return 1;
+        if (time_codegen.value.on) end = get_current_time();
+        if (longs.items) free(longs.items);
+        if (time_codegen.value.on) time_current_action(&codegen_timer, start, end);
+
+        FILE *logs = fopen("logs.log", "w");
+        int logs_fd = fileno(logs);
+        /* Redirect redirect = {.fdout = &logs_fd}; */
+        redirect.fdout = &logs_fd;
+
+        if (time_fasm.value.on) start = get_current_time();
         cmd_append(&cmd, "fasm", paths.fasm_input);
         if (!run_cmd(&cmd, redirect, display)) return 1;
+        if (time_fasm.value.on) end = get_current_time();
+
+        if (logs) fclose(logs);
+        if (time_fasm.value.on) time_current_action(&fasm_timer, start, end);
+
+        redirect.fdout = NULL;
+
+      } else if (compile_binary.value.on) {
+        if (time_binary.value.on) start = get_current_time();
+        Longs longs = {0};
+        BinaryGenerator binary_generator = {
+          .longs = &longs, .t = &t,
+          .fn = funcs.items, .op = funcs.items->items,
+          .fns = &funcs,
+          .globals = p.globals,
+          .tape_size = tape_size.value.u64,
+          .arg_tape_size = arg_tape_size.value.u64,
+          .ret_tape_size = ret_tape_size.value.u64,
+          .global_var_tape_size = global_var_tape_size.value.u64,
+          .local_var_tape_size = local_var_tape_size.value.u64,
+        };
+        if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
+        if (time_binary.value.on) end = get_current_time();
       }
-      if (time_fasm.value.on) end = get_current_time();
 
-      if (logs) fclose(logs);
-      if (time_fasm.value.on) time_current_action(&fasm_timer, start, end);
-
-      redirect.fdout = NULL;
-      if (comp.value.on) {
+      if (comp.value.on || compile_binary.value.on) {
         cmd_append(&cmd, "chmod", "+x", paths.output_bin);
         if (!run_cmd(&cmd, redirect, display)) return 1;
       }

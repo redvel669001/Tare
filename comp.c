@@ -177,6 +177,7 @@ int main(int argc, char **argv) {
     TARE_SOURCE_TARE_C = 0,
     TARE_SOURCE_CMD_H,
     TARE_SOURCE_CODEGEN_H,
+    TARE_SOURCE_BINGEN_H,
     TARE_SOURCE_DA_H,
     TARE_SOURCE_FLAGS_H,
     TARE_SOURCE_LEXER_H,
@@ -201,7 +202,8 @@ int main(int argc, char **argv) {
   const char *tare_sources[TARE_SOURCES] = {
     [TARE_SOURCE_TARE_C] = "./tare.c",
     [TARE_SOURCE_CMD_H] = "./cmd.h",
-    [TARE_SOURCE_CODEGEN_H] = "codegen.h",
+    [TARE_SOURCE_CODEGEN_H] = "./codegen.h",
+    [TARE_SOURCE_BINGEN_H] = "./bingen.h",
     [TARE_SOURCE_DA_H] = "./da.h",
     [TARE_SOURCE_FLAGS_H] = "./flags.h",
     [TARE_SOURCE_LEXER_H] = "./lexer.h",
