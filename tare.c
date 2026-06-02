@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
   Flag comp = {
     .name_short = "-c", .name_long = "--compile",
     .description = "compile a native executable.",
+    .default_value.on = true,
   };
   Flag run = {
     .name_short = "-r", .name_long = "--run",
@@ -147,8 +148,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (run.value.on) comp.value.on = true;
-  if (comp.value.on) sim.value.on = false;
+  if (sim.value.on) comp.value.on = false;
+  if (!comp.value.on) run.value.on = false;
 
   if (time_thoroughly.parsed) {
     time_tokenization.value.on = true;
