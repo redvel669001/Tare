@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 #define CFLAGS_COUNT 42
-#define CFLAGS "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum"
+#define CFLAGS "-Wall", "-Wextra", "-pedantic", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wjump-misses-init", "-Wdouble-promotion", "-Wshadow", "-Og", "-Wformat=2", "-Wformat-overflow=2", "-Wformat-truncation=2", "-Wformat-signedness", "-Winit-self", "-Wmissing-include-dirs", "-Wsync-nand", "-Wtrivial-auto-var-init", "-Wunused-const-variable=2", "-Wuse-after-free=3", "-Wstrict-flex-arrays", "-Walloc-zero", "-Wtrampolines", "-Wundef", "-Wunused-macros", "-Wbad-function-cast", "-Wcast-align", "-Wstrict-prototypes", "-Wold-style-definition", "-Wpacked", "-Wnested-externs", "-fstrict-flex-arrays", "-Wstrict-overflow=2", "-Wstringop-overflow=4", "-Warray-bounds=2", "-Warith-conversion", "-Wwrite-strings", "-Wdate-time", "-Wredundant-decls", "-Wrestrict", "-Wswitch-enum",
 
 TARE_DEF void verify_flags(void);
 
@@ -35,13 +35,14 @@ int main(int argc, char **argv) {
     FLAG_NO_REBUILD,
     FLAG_REBUILD_REST,
     FLAG_DEBUG,
+    FLAG_ANALYZE,
     FLAG_PROFILE,
     FLAG_TEST,
     FLAG_HELP,
     FLAGS_COUNT,
   };
 
-  static_assert(FLAGS_COUNT == 9, "Flags count has been chagned. Please update the flags to match the new count.");
+  static_assert(FLAGS_COUNT == 10, "Flags count has been chagned. Please update the flags to match the new count.");
   Flag fast = {
     .name_short = "-f", .name_long = "--fast",
     .description = "use optimization when compiling [-Ofast flag].",
@@ -66,6 +67,10 @@ int main(int argc, char **argv) {
     .name_short = "-g", .name_long = "--debug",
     .description = "compile with debug information [-g or --ggdb flag].",
   };
+  Flag analyze = {
+    .name_short = "-a", .name_long = "--analyze",
+    .description = "enable static analysis during compilation [-fanalyzer]p.",
+  };
   Flag profile = {
     .name_short = "-p", .name_long = "--profile",
     .description = "profile `tare` with valgrind to fix bugs and improve it.",
@@ -79,7 +84,7 @@ int main(int argc, char **argv) {
     .description = "present this infromation.",
   };
   
-  static_assert(FLAGS_COUNT == 9, "Flags count has been chagned. Please update the array to match the new count.");
+  static_assert(FLAGS_COUNT == 10, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_FAST] = &fast,
     [FLAG_WERROR] = &werror,
@@ -87,6 +92,7 @@ int main(int argc, char **argv) {
     [FLAG_NO_REBUILD] = &no_rebuild,
     [FLAG_REBUILD_REST] = &rebuild_rest,
     [FLAG_DEBUG] = &debug,
+    [FLAG_ANALYZE] = &analyze,
     [FLAG_PROFILE] = &profile,
     [FLAG_TEST] = &test,
     [FLAG_HELP] = &help,
@@ -157,6 +163,7 @@ int main(int argc, char **argv) {
     if (fast.value.on) cmd_append(&cmd, "-Ofast");
     if (werror.value.on) cmd_append(&cmd, "-Werror");
     if (debug.value.on) cmd_append(&cmd, "-ggdb");
+    if (analyze.value.on) cmd_append(&cmd, "-fanalyzer");
     if (!run_cmd(&cmd, redirect, true)) return 1;
     
     if (rebuild.value.on) rebuild.value.on = false;
@@ -178,6 +185,7 @@ int main(int argc, char **argv) {
     TARE_SOURCE_CMD_H,
     TARE_SOURCE_CODEGEN_H,
     TARE_SOURCE_BINGEN_H,
+    TARE_SOURCE_REGISTERS_H,
     TARE_SOURCE_DA_H,
     TARE_SOURCE_FLAGS_H,
     TARE_SOURCE_LEXER_H,
@@ -204,6 +212,7 @@ int main(int argc, char **argv) {
     [TARE_SOURCE_CMD_H] = "./cmd.h",
     [TARE_SOURCE_CODEGEN_H] = "./codegen.h",
     [TARE_SOURCE_BINGEN_H] = "./bingen.h",
+    [TARE_SOURCE_REGISTERS_H] = "./registers.h",
     [TARE_SOURCE_DA_H] = "./da.h",
     [TARE_SOURCE_FLAGS_H] = "./flags.h",
     [TARE_SOURCE_LEXER_H] = "./lexer.h",
@@ -246,6 +255,7 @@ int main(int argc, char **argv) {
     if (fast.value.on) cmd_append(&cmd, "-Ofast");
     if (werror.value.on) cmd_append(&cmd, "-Werror");
     if (debug.value.on) cmd_append(&cmd, "-ggdb");
+    if (analyze.value.on) cmd_append(&cmd, "-fanalyzer");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
 

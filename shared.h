@@ -149,6 +149,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   ThoroughTimer tokenization_timer = { .best = 1 };
   ThoroughTimer parsing_timer      = { .best = 1 };
   ThoroughTimer codegen_timer      = { .best = 1 };
+  ThoroughTimer bin_timer          = { .best = 1 };
   ThoroughTimer fasm_timer         = { .best = 1 };
   ThoroughTimer sim_timer          = { .best = 1 };
 
@@ -225,11 +226,11 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
       if (vids.items) free(vids.items);
       if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
     } else {
+      Longs longs = {0};
       Redirect redirect = {0};
       bool display = false;
 
       if (comp.value.on) {
-        Longs longs = {0};
         Generator gen = {
           .longs = &longs, .t = &t,
           .fn = funcs.items, .op = funcs.items->items,
@@ -244,7 +245,6 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
         if (time_codegen.value.on) start = get_current_time();
         if (!gen_fasm(paths.output, &gen)) return 1;
         if (time_codegen.value.on) end = get_current_time();
-        if (longs.items) free(longs.items);
         if (time_codegen.value.on) time_current_action(&codegen_timer, start, end);
 
         FILE *logs = fopen("logs.log", "w");
@@ -263,7 +263,11 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
 
       } else if (compile_binary.value.on) {
         if (time_binary.value.on) start = get_current_time();
-        Longs longs = {0};
+        String bytes = {0};
+        Patches patches = {0};
+        Longs fn_addrs = {0};
+        Addresses addrs = {0};
+        Longs longs_locations = {0};
         BinaryGenerator binary_generator = {
           .longs = &longs, .t = &t,
           .fn = funcs.items, .op = funcs.items->items,
@@ -274,10 +278,18 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
           .ret_tape_size = ret_tape_size.value.u64,
           .global_var_tape_size = global_var_tape_size.value.u64,
           .local_var_tape_size = local_var_tape_size.value.u64,
+          .bytes = &bytes,
+          .patches = &patches,
+          .fn_addrs = &fn_addrs,
+          .addrs = &addrs,
+          .longs_locations = &longs_locations,
         };
         if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
         if (time_binary.value.on) end = get_current_time();
+        if (time_binary.value.on) time_current_action(&bin_timer, start, end);
       }
+
+      if (longs.items) free(longs.items);
 
       if (comp.value.on || compile_binary.value.on) {
         cmd_append(&cmd, "chmod", "+x", paths.output_bin);
@@ -287,6 +299,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
         cmd_append(&cmd, paths.output_bin);
         if (!run_cmd(&cmd, redirect, display)) return 1;
       }
+
     }
     if (t.l.items) free(t.l.items);
     if (t.items) free(t.items);
@@ -314,6 +327,9 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
 
   if (time_codegen.value.on)
     print_thorough_timer(codegen_timer, count, "Codegen");
+
+  if (time_binary.value.on)
+    print_thorough_timer(bin_timer, count, "Binary");
 
   if (time_fasm.value.on)
     print_thorough_timer(fasm_timer, count, "Fasm");
@@ -397,10 +413,10 @@ TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
     if (vids.items) free(vids.items);
     if (simulator.ret_addrs.items) free(simulator.ret_addrs.items);
   } else {
+    Longs longs = {0};
     Redirect redirect = {0};
     bool display = false;
     if (comp.value.on) {
-      Longs longs = {0};
       Generator gen = {
         .longs = &longs, .t = &t,
         .fn = funcs.items, .op = funcs.items->items,
@@ -415,7 +431,6 @@ TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
       if (time_codegen.value.on) start = get_current_time();
       if (!gen_fasm(paths.output, &gen)) return 1;
       if (time_codegen.value.on) end = get_current_time();
-      if (longs.items) free(longs.items);
       if (time_codegen.value.on) print_elapsed_time(start, end, "Codegen");
 
       FILE *logs = fopen("logs.log", "w");
@@ -433,7 +448,11 @@ TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
       redirect.fdout = NULL;
     } else if (compile_binary.value.on) {
       if (time_binary.value.on) start = get_current_time();
-      Longs longs = {0};
+      String bytes = {0};
+      Patches patches = {0};
+      Longs fn_addrs = {0};
+      Addresses addrs = {0};
+      Longs longs_locations = {0};
       BinaryGenerator binary_generator = {
         .longs = &longs, .t = &t,
         .fn = funcs.items, .op = funcs.items->items,
@@ -444,10 +463,18 @@ TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
         .ret_tape_size = ret_tape_size.value.u64,
         .global_var_tape_size = global_var_tape_size.value.u64,
         .local_var_tape_size = local_var_tape_size.value.u64,
+        .bytes = &bytes,
+        .patches = &patches,
+        .fn_addrs = &fn_addrs,
+        .addrs = &addrs,
+        .longs_locations = &longs_locations,
       };
       if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
       if (time_binary.value.on) end = get_current_time();
+      if (time_binary.value.on) print_elapsed_time(start, end, "Binary");
     }
+
+    if (longs.items) free(longs.items);
 
     if (comp.value.on || compile_binary.value.on) {
       cmd_append(&cmd, "chmod", "+x", paths.output_bin);

@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
       || compile_binary.value.on) comp.value.on = false;
   if (dump_asm.value.on || compile_binary.value.on) sim.value.on = false;
   if (compile_binary.value.on) dump_asm.value.on = false;
-  if (!comp.value.on) run.value.on = false;
+  if (!comp.value.on && !compile_binary.value.on) run.value.on = false;
 
   if (!comp.value.on && !dump_asm.value.on
       && !compile_binary.value.on) time_codegen.value.on = false;
@@ -157,8 +157,8 @@ int main(int argc, char **argv) {
   if (time_thoroughly.parsed) {
     time_tokenization.value.on = true;
     time_parsing.value.on = true;
-    if (comp.value.on || dump_asm.value.on
-        || compile_binary.value.on) time_codegen.value.on = true;
+    if ((comp.value.on || dump_asm.value.on)
+        && !compile_binary.value.on) time_codegen.value.on = true;
     if (compile_binary.value.on) time_binary.value.on = true;
     if (run.value.on) time_fasm.value.on = true;
     if (sim.value.on) time_simulator.value.on = true;
