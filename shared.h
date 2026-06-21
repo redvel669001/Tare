@@ -85,14 +85,124 @@ typedef enum {
 } TareFlag;
 static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
 
+Flag sim = {
+  .name_short = "-s", .name_long = "--simulate",
+  .description = "invoke an interpreter instead of a compiler.",
+};
+Flag comp = {
+  .name_short = "-c", .name_long = "--compile",
+  .description = "compile a native executable.",
+  .default_value.on = true,
+};
+Flag dump_asm = {
+  .name_short = "-da", .name_long = "--dump-assembly",
+  .description = "translate to assembly (fasm) but do not assemble.",
+};
+Flag compile_binary = {
+  .name_short = "-b", .name_long = "--binary",
+  .description = "translate directly to binary rather than assembly (fasm).",
+};
+Flag run = {
+  .name_short = "-r", .name_long = "--run",
+  .description = "compile and run a native executable.",
+};
+Flag time_tokenization = {
+  .name_short = "-tt", .name_long = "--time-tokenization",
+  .description = "calculate the time for tokenization.",
+};
+Flag time_parsing = {
+  .name_short = "-tp", .name_long = "--time-parsing",
+  .description = "calculate the time for parsing.",
+};
+Flag time_codegen = {
+  .name_short = "-tc", .name_long = "--time-codegen",
+  .description = "calculate the time for code generation.",
+};
+Flag time_fasm = {
+  .name_short = "-tf", .name_long = "--time-fasm",
+  .description = "calculate the time for the assembler (fasm).",
+};
+Flag time_binary = {
+  .name_short = "-tb", .name_long = "--time-binary",
+  .description = "calculate the time for the binary translation (not fasm).",
+};
+Flag time_simulator = {
+  .name_short = "-ts", .name_long = "--time-simulator",
+  .description = "calculate the time for the simulator.",
+};
+Flag time_thoroughly = {
+  .name_short = "-tith", .name_long = "--time-thoroughly",
+  .description = "collect timing statistics for every part of the compiler.",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = 1,
+};
+Flag tape_size = {
+  .name_short = "-ts", .name_long = "--tape-size",
+  .description = "specify the size of the tape (in bytes).",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = TAPE_SIZE,
+};
+Flag arg_tape_size = {
+  .name_short = "-ats", .name_long = "--arg-tape-size",
+  .description = "specify the size of the function argument tape in bytes.",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = ARG_TAPE_SIZE,
+};
+Flag ret_tape_size = {
+  .name_short = "-rts", .name_long = "--ret-tape-size",
+  .description = "specify the size of the return value tape in bytes.",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = RET_TAPE_SIZE,
+};
+Flag global_var_tape_size = {
+  .name_short = "-gvts", .name_long = "--global-var-tape-size",
+  .description = "specify the size of the global variable tape in bytes.",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = GLOBAL_VAR_TAPE_SIZE,
+};
+Flag local_var_tape_size = {
+  .name_short = "-lvts", .name_long = "--local-var-tape-size",
+  .description = "specify the size of the local variable tape in bytes.",
+  .type = FLAG_TYPE_U64,
+  .default_value.u64 = LOCAL_VAR_TAPE_SIZE,
+};
+Flag help = {
+  .name_short = "-h", .name_long = "--help",
+  .description = "present this infromation.",
+};
+
+static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the array to match the new count.");
+Flag *flag_array[TARE_FLAGS_COUNT] = {
+  [TARE_FLAG_SIMULATE] = &sim,
+  [TARE_FLAG_COMPILE_FASM] = &comp,
+  [TARE_FLAG_DUMP_ASSEMBLY] = &dump_asm,
+  [TARE_FLAG_COMPILE_BINARY] = &compile_binary,
+  [TARE_FLAG_RUN] = &run,
+  [TARE_FLAG_TIME_TOKENIZER] = &time_tokenization,
+  [TARE_FLAG_TIME_PARSER] = &time_parsing,
+  [TARE_FLAG_TIME_CODEGEN] = &time_codegen,
+  [TARE_FLAG_TIME_FASM] = &time_fasm,
+  [TARE_FLAG_TIME_BINARY] = &time_binary,
+  [TARE_FLAG_TIME_SIMULATOR] = &time_simulator,
+  [TARE_FLAG_TIME_THOROUGHLY] = &time_thoroughly,
+  [TARE_FLAG_TAPE_SIZE] = &tape_size,
+  [TARE_FLAG_ARG_TAPE_SIZE] = &arg_tape_size,
+  [TARE_FLAG_RET_TAPE_SIZE] = &ret_tape_size,
+  [TARE_FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
+  [TARE_FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
+  [TARE_FLAG_HELP] = &help,
+};
+
+Flags flags = { .items = flag_array, .count = TARE_FLAGS_COUNT, };
+
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
 TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
 
 TARE_DEF size_t get_current_time(void);
 TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
 
-TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags);
-TARE_DEF int comp_or_sim_once(Paths paths, Flags flags);
+TARE_DEF int comp_or_sim_multiple_times(Paths paths);
+TARE_DEF int comp_or_sim_once(Paths paths);
 TARE_DEF void time_current_action(ThoroughTimer *t, size_t start, size_t end);
 TARE_DEF void print_thorough_timer(ThoroughTimer timer, size_t count, const char *name);
 
@@ -144,7 +254,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) 
 }
 
 static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
-TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
+TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   int ret = 0;
   ThoroughTimer tokenization_timer = { .best = 1 };
   ThoroughTimer parsing_timer      = { .best = 1 };
@@ -152,23 +262,6 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
   ThoroughTimer bin_timer          = { .best = 1 };
   ThoroughTimer fasm_timer         = { .best = 1 };
   ThoroughTimer sim_timer          = { .best = 1 };
-
-  Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
-  Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
-  Flag compile_binary       = *flags.items[TARE_FLAG_COMPILE_BINARY];
-  Flag run                  = *flags.items[TARE_FLAG_RUN];
-  Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
-  Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
-  Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
-  Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
-  Flag time_binary          = *flags.items[TARE_FLAG_TIME_BINARY];
-  Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
-  Flag time_thoroughly      = *flags.items[TARE_FLAG_TIME_THOROUGHLY];
-  Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
-  Flag arg_tape_size        = *flags.items[TARE_FLAG_ARG_TAPE_SIZE];
-  Flag ret_tape_size        = *flags.items[TARE_FLAG_RET_TAPE_SIZE];
-  Flag global_var_tape_size = *flags.items[TARE_FLAG_GLOBAL_VAR_TAPE_SIZE];
-  Flag local_var_tape_size  = *flags.items[TARE_FLAG_LOCAL_VAR_TAPE_SIZE];
 
   Cmd cmd = {0};
 
@@ -341,24 +434,8 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths, Flags flags) {
 }
 
 static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
-TARE_DEF int comp_or_sim_once(Paths paths, Flags flags) {
+TARE_DEF int comp_or_sim_once(Paths paths) {
   int ret = 0;
-
-  Flag sim                  = *flags.items[TARE_FLAG_SIMULATE];
-  Flag comp                 = *flags.items[TARE_FLAG_COMPILE_FASM];
-  Flag compile_binary       = *flags.items[TARE_FLAG_COMPILE_BINARY];
-  Flag run                  = *flags.items[TARE_FLAG_RUN];
-  Flag time_tokenization    = *flags.items[TARE_FLAG_TIME_TOKENIZER];
-  Flag time_parsing         = *flags.items[TARE_FLAG_TIME_PARSER];
-  Flag time_codegen         = *flags.items[TARE_FLAG_TIME_CODEGEN];
-  Flag time_fasm            = *flags.items[TARE_FLAG_TIME_FASM];
-  Flag time_binary          = *flags.items[TARE_FLAG_TIME_BINARY];
-  Flag time_simulator       = *flags.items[TARE_FLAG_TIME_SIMULATOR];
-  Flag tape_size            = *flags.items[TARE_FLAG_TAPE_SIZE];
-  Flag arg_tape_size        = *flags.items[TARE_FLAG_ARG_TAPE_SIZE];
-  Flag ret_tape_size        = *flags.items[TARE_FLAG_RET_TAPE_SIZE];
-  Flag global_var_tape_size = *flags.items[TARE_FLAG_GLOBAL_VAR_TAPE_SIZE];
-  Flag local_var_tape_size  = *flags.items[TARE_FLAG_LOCAL_VAR_TAPE_SIZE];
 
   Tokenizer t = {0};
   size_t start = get_current_time();

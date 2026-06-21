@@ -63,26 +63,6 @@ const char *examples[EXAMPLES_COUNT] = {
 int main(int argc, char **argv) {
   const char *program = *argv;
 
-  argc--;
-  argv++;
-
-  enum {
-    FLAG_HELP = 0,
-    FLAGS_COUNT,
-  };
-
-  static_assert(FLAGS_COUNT == 1, "Flags count has been chagned. Please update the flags to match the new count.");
-  Flag help = {
-    .name_short = "-h", .name_long = "--help",
-    .description = "present this infromation.",
-  };
-
-  static_assert(FLAGS_COUNT == 1, "Flags count has been chagned. Please update the array to match the new count.");
-  Flag *flag_array[FLAGS_COUNT] = {
-    [FLAG_HELP] = &help,
-  };
-
-  Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
   if (!parse_flags(&args, &flags)) {
     if (args.arg != NULL)

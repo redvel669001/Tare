@@ -25,9 +25,6 @@ int main(int argc, char **argv) {
   const char *bin_path = *argv;
   const char *src_path = __FILE__;
 
-  argc--;
-  argv++;
-
   enum {
     FLAG_FAST = 0,
     FLAG_WERROR,
@@ -112,7 +109,8 @@ int main(int argc, char **argv) {
   Flags flags = { .items = flag_array, .count = FLAGS_COUNT, };
   Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
   if (!parse_flags(&args, &flags)) {
-    fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
+    if (args.arg != NULL)
+      fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
     print_usage(stderr, bin_path, "", flags);
     return 1;
   }
