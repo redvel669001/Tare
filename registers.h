@@ -1,0 +1,88 @@
+#ifndef REGISTERS_H_
+#define REGISTERS_H_
+
+typedef enum {
+  RAX = 0,
+  RBX,
+  RCX,
+  RDX,
+  RSI,
+  RDI,
+  RBP,
+  RSP,
+  R8,
+  R9,
+  R10,
+  R11,
+  R12,
+  R13,
+  R14,
+  R15,
+  REG_64_COUNT,
+} Reg64;
+
+typedef enum {
+  EAX = 0,
+  EBX,
+  ECX,
+  EDX,
+  ESI,
+  EDI,
+  EBP,
+  ESP,
+  R8D,
+  R9D,
+  R10D,
+  R11D,
+  R12D,
+  R13D,
+  R14D,
+  R15D,
+  REG_32_COUNT,
+} Reg32;
+
+typedef enum {
+  AX = 0,
+  BX,
+  CX,
+  DX,
+  SI,
+  DI,
+  BP,
+  SP,
+  R8W,
+  R9W,
+  R10W,
+  R11W,
+  R12W,
+  R13W,
+  R14W,
+  R15W,
+  REG_16_COUNT,
+} Reg16;
+
+typedef enum {
+  AL = 0,
+  AH,
+  BL,
+  BH,
+  CL,
+  CH,
+  DL,
+  DH,
+  SIL,
+  DIL,
+  BPL,
+  SPL,
+  R8B,
+  R9B,
+  R10B,
+  R11B,
+  R12B,
+  R13B,
+  R14B,
+  R15B,
+  REG_8_COUNT,
+} Reg8;
+
+#endif // BINGEN_H_
