@@ -380,6 +380,12 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
         if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
         if (time_binary.value.on) end = get_current_time();
         if (time_binary.value.on) time_current_action(&bin_timer, start, end);
+
+        if (bytes.items)           free(bytes.items);
+        if (patches.items)         free(patches.items);
+        if (fn_addrs.items)        free(fn_addrs.items);
+        if (addrs.items)           free(addrs.items);
+        if (longs_locations.items) free(longs_locations.items);
       }
 
       if (longs.items) free(longs.items);
@@ -549,6 +555,12 @@ TARE_DEF int comp_or_sim_once(Paths paths) {
       if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
       if (time_binary.value.on) end = get_current_time();
       if (time_binary.value.on) print_elapsed_time(start, end, "Binary");
+
+      if (bytes.items)           free(bytes.items);
+      if (patches.items)         free(patches.items);
+      if (fn_addrs.items)        free(fn_addrs.items);
+      if (addrs.items)           free(addrs.items);
+      if (longs_locations.items) free(longs_locations.items);
     }
 
     if (longs.items) free(longs.items);
