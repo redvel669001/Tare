@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
     cmd_append(&cmd, "./tare");
     cmd_append(&cmd, "-i", paths.input);
     cmd_append(&cmd, "-o", paths.output);
-    for (int j = 0; j < argc; j++) {
+    for (int j = 1; j < argc; j++) {
       cmd_append(&cmd, argv[j]);
     }
     if (!run_cmd(&cmd, redirect, true)) return 1;
