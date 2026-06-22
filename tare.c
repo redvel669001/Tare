@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     if ((comp.value.on || dump_asm.value.on)
         && !compile_binary.value.on) time_codegen.value.on = true;
     if (compile_binary.value.on) time_binary.value.on = true;
-    if (run.value.on) time_fasm.value.on = true;
+    if (run.value.on && !compile_binary.value.on) time_fasm.value.on = true;
     if (sim.value.on) time_simulator.value.on = true;
   }
 
