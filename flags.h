@@ -4,12 +4,14 @@
 typedef enum {
   FLAG_TYPE_BOOL = 0,
   FLAG_TYPE_U64,
+  FLAG_TYPE_STR,
   FLAG_TYPES,
 } FlagValueType;
 
 typedef union {
   bool on;
   size_t u64;
+  const char *str;
 } FlagValue;
 
 typedef struct {
@@ -43,7 +45,7 @@ TARE_DEF bool parse_flags(Args *args, Flags *flags);
 
 TARE_DEF void print_flag(Flag flag);
 TARE_DEF size_t max_pad_from_max_length(size_t max_length);
-TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Flags flags);
+TARE_DEF void print_usage(FILE *out, const char *program, Flags flags);
 
 #endif // FLAGS_H_
 
@@ -89,6 +91,10 @@ TARE_DEF bool parse_flags(Args *args, Flags *flags) {
         if (!next_arg(args)) return false;
         if (!arg_to_u64(args->arg, &flag->value.u64)) return false;
         break;
+      case FLAG_TYPE_STR:
+        if (!next_arg(args)) return false;
+        flag->value.str = args->arg;
+        break;
       case FLAG_TYPES: default: assert(false && "unreachable");
       }
       break;
@@ -112,6 +118,7 @@ TARE_DEF void print_flag(Flag flag) {
   case FLAG_TYPE_BOOL:
     printf("  .on = %s\n", flag.value.on ? "true" : "false"); break;
   case FLAG_TYPE_U64: printf("  .u64 = %zu\n", flag.value.u64); break;
+  case FLAG_TYPE_STR: printf("  .str = %s\n", flag.value.str); break;
   case FLAG_TYPES: default: assert(false && "unreachable");
   }
   printf("}\n");
@@ -126,10 +133,9 @@ TARE_DEF size_t max_pad_from_max_length(size_t max_length) {
   return max_pad;
 }
 
-TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Flags flags) {
-  fprintf(out, "Usage:\n");
-  fprintf(out, "%s %s[FLAGS]\n", program, input);
-  fprintf(out, "\nFLAGS:\n");
+TARE_DEF void print_usage(FILE *out, const char *program, Flags flags) {
+  fprintf(out, "Usage: %s [FLAGS]\n\n", program);
+  fprintf(out, "FLAGS:\n");
 
   size_t length = 0;
   size_t name_short_max_length = 0;
@@ -148,6 +154,12 @@ TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Fla
       length = strlen(flag->name_short) + strlen(" <size>");
       if (length > name_short_max_length) name_short_max_length = length;
       length = strlen(flag->name_long) + strlen(" <size>");
+      if (length > name_long_max_length) name_long_max_length = length;
+      break;
+    case FLAG_TYPE_STR:
+      length = strlen(flag->name_short) + strlen(" <str>");
+      if (length > name_short_max_length) name_short_max_length = length;
+      length = strlen(flag->name_long) + strlen(" <str>");
       if (length > name_long_max_length) name_long_max_length = length;
       break;
     case FLAG_TYPES: default: assert(false && "unreachable");
@@ -181,6 +193,15 @@ TARE_DEF void print_usage(FILE *out, const char *program, const char *input, Fla
               flag->name_long, (int) name_long_pad, "",
               flag->description, (int) description_pad, "",
               flag->default_value.u64);
+      break;
+    case FLAG_TYPE_STR:
+      name_short_pad -= strlen(" <str>");
+      name_long_pad -= strlen(" <str>");
+      fprintf(out, "  %s <str>%*s|  %s <str>%*s:  %s%*s|  Default value: %s\n",
+              flag->name_short, (int) name_short_pad, "",
+              flag->name_long, (int) name_long_pad, "",
+              flag->description, (int) description_pad, "",
+              flag->default_value.str);
       break;
     case FLAG_TYPES: default: assert(false && "unreachable");
     }

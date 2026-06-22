@@ -32,32 +32,32 @@ typedef enum {
 } Example;
 
 const char *examples[EXAMPLES_COUNT] = {
-  [EXAMPLE_BASE] = "./examples/base.tare",
-  [EXAMPLE_TEST] = "./examples/test.tare",
-  [EXAMPLE_HELLO] = "./examples/hello.tare",
-  [EXAMPLE_HELLO_ARABIC] = "./examples/hello_arabic.tare",
-  [EXAMPLE_HELLO_CHINESE] = "./examples/hello_chinese.tare",
-  [EXAMPLE_HELLO_HEBREW] = "./examples/hello_hebrew.tare",
-  [EXAMPLE_HELLO_JAPANESE] = "./examples/hello_japanese.tare",
-  [EXAMPLE_HELLO_RUSSIAN] = "./examples/hello_russian.tare",
-  [EXAMPLE_LOVE] = "./examples/love.tare",
-  [EXAMPLE_IF] = "./examples/if.tare",
-  [EXAMPLE_WHILE] = "./examples/while.tare",
-  [EXAMPLE_HEART] = "./examples/heart.tare",
-  [EXAMPLE_FUNC] = "./examples/func.tare",
-  [EXAMPLE_RECURSION] = "./examples/recursion.tare",
-  [EXAMPLE_READ] = "./examples/read.tare",
-  [EXAMPLE_TAPE] = "./examples/tape.tare",
-  [EXAMPLE_TAPE_READ] = "./examples/tape_read.tare",
-  [EXAMPLE_HEAD] = "./examples/head.tare",
-  [EXAMPLES_SYSCALL] = "./examples/syscall.tare",
-  [EXAMPLES_RETS] = "./examples/rets.tare",
-  [EXAMPLES_FUNC_WITH_RETS] = "./examples/func_with_rets.tare",
-  [EXAMPLES_PUSH] = "./examples/push.tare",
-  [EXAMPLES_OPERATIONS] = "./examples/operations.tare",
-  [EXAMPLES_PRINT_NUM] = "./examples/print_num.tare",
-  [EXAMPLES_FIB] = "./examples/fib.tare",
-  [EXAMPLES_GLOBALS] = "./examples/globals.tare",
+  [EXAMPLE_BASE] = "base.tare",
+  [EXAMPLE_TEST] = "test.tare",
+  [EXAMPLE_HELLO] = "hello.tare",
+  [EXAMPLE_HELLO_ARABIC] = "hello_arabic.tare",
+  [EXAMPLE_HELLO_CHINESE] = "hello_chinese.tare",
+  [EXAMPLE_HELLO_HEBREW] = "hello_hebrew.tare",
+  [EXAMPLE_HELLO_JAPANESE] = "hello_japanese.tare",
+  [EXAMPLE_HELLO_RUSSIAN] = "hello_russian.tare",
+  [EXAMPLE_LOVE] = "love.tare",
+  [EXAMPLE_IF] = "if.tare",
+  [EXAMPLE_WHILE] = "while.tare",
+  [EXAMPLE_HEART] = "heart.tare",
+  [EXAMPLE_FUNC] = "func.tare",
+  [EXAMPLE_RECURSION] = "recursion.tare",
+  [EXAMPLE_READ] = "read.tare",
+  [EXAMPLE_TAPE] = "tape.tare",
+  [EXAMPLE_TAPE_READ] = "tape_read.tare",
+  [EXAMPLE_HEAD] = "head.tare",
+  [EXAMPLES_SYSCALL] = "syscall.tare",
+  [EXAMPLES_RETS] = "rets.tare",
+  [EXAMPLES_FUNC_WITH_RETS] = "func_with_rets.tare",
+  [EXAMPLES_PUSH] = "push.tare",
+  [EXAMPLES_OPERATIONS] = "operations.tare",
+  [EXAMPLES_PRINT_NUM] = "print_num.tare",
+  [EXAMPLES_FIB] = "fib.tare",
+  [EXAMPLES_GLOBALS] = "globals.tare",
 };
 
 int main(int argc, char **argv) {
@@ -67,23 +67,34 @@ int main(int argc, char **argv) {
   if (!parse_flags(&args, &flags)) {
     if (args.arg != NULL)
       fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
-    print_usage(stderr, program, "", flags);
+    print_usage(stderr, program, flags);
     return 1;
   }
 
   if (help.value.on) {
-    print_usage(stdout, program, "", flags);
+    print_usage(stdout, program, flags);
     return 0;
   }
 
   Paths examples_paths[EXAMPLES_COUNT] = {0};
   StringView src = SV_MAKE(./examples/);
-  StringView build = SV_MAKE(build/);
+  StringView build = SV_MAKE(./build/);
+  String arena = {0};
+  da_reserve(&arena, EXAMPLES_COUNT * 64);
 
   for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
     Paths *paths = examples_paths + i;
-    paths->src = src;
-    if (!paths_from_tare(examples[i], paths, build)) return 1;
+
+    const char *example = examples[i];
+    paths->input = arena.items + arena.count;
+    if (!append_sv_to_string(&arena, src)) return false;
+    if (!append_cstr_to_string(&arena, example)) return false;
+    da_append(&arena, 0);
+    paths->output = arena.items + arena.count;
+    if (!append_sv_to_string(&arena, build)) return false;
+    size_t final_dot = find_final_dot(example, strlen(example));
+    if (!append_to_string(&arena, examples[i], final_dot)) return false;
+    da_append(&arena, 0);
   }
 
   Cmd cmd = {0};
@@ -91,9 +102,13 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < EXAMPLES_COUNT; i++) {
     if (i == EXAMPLE_FUNC || i == EXAMPLE_READ) continue;
     Paths paths = examples_paths[i];
+    assert(paths.input != NULL && "unreachable");
+    assert(paths.output != NULL && "unreachable");
     printf("--------------------------------------------------\n");
-    printf("%s\n", paths.path);
-    cmd_append(&cmd, "./tare", paths.path);
+    printf("%s\n", paths.input);
+    cmd_append(&cmd, "./tare");
+    cmd_append(&cmd, "-i", paths.input);
+    cmd_append(&cmd, "-o", paths.output);
     for (int j = 0; j < argc; j++) {
       cmd_append(&cmd, argv[j]);
     }

@@ -48,12 +48,10 @@ TARE_DEF bool check_bounds(size_t index, size_t count);
 #define LOCAL_VAR_TAPE_SIZE (size_t) 1024
 
 typedef struct {
-  const char *path;
+  const char *input;
   const char *output;
   const char *fasm_input;
-  const char *output_bin;
   String arena;
-  StringView src;
 } Paths;
 
 typedef struct {
@@ -63,7 +61,9 @@ typedef struct {
 } ThoroughTimer;
 
 typedef enum {
-  TARE_FLAG_SIMULATE = 0,
+  TARE_FLAG_INPUT = 0,
+  TARE_FLAG_OUTPUT,
+  TARE_FLAG_SIMULATE,
   TARE_FLAG_COMPILE_FASM,
   TARE_FLAG_DUMP_ASSEMBLY,
   TARE_FLAG_COMPILE_BINARY,
@@ -83,8 +83,18 @@ typedef enum {
   TARE_FLAG_HELP,
   TARE_FLAGS_COUNT,
 } TareFlag;
-static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
 
+static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
+Flag input = {
+  .name_short = "-i", .name_long = "--input",
+  .description = "input file path.",
+  .type = FLAG_TYPE_STR,
+};
+Flag output = {
+  .name_short = "-o", .name_long = "--output",
+  .description = "output file path.",
+  .type = FLAG_TYPE_STR,
+};
 Flag sim = {
   .name_short = "-s", .name_long = "--simulate",
   .description = "invoke an interpreter instead of a compiler.",
@@ -171,8 +181,10 @@ Flag help = {
   .description = "present this infromation.",
 };
 
-static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the array to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the array to match the new count.");
 Flag *flag_array[TARE_FLAGS_COUNT] = {
+  [TARE_FLAG_INPUT] = &input,
+  [TARE_FLAG_OUTPUT] = &output,
   [TARE_FLAG_SIMULATE] = &sim,
   [TARE_FLAG_COMPILE_FASM] = &comp,
   [TARE_FLAG_DUMP_ASSEMBLY] = &dump_asm,
@@ -196,7 +208,7 @@ Flag *flag_array[TARE_FLAGS_COUNT] = {
 Flags flags = { .items = flag_array, .count = TARE_FLAGS_COUNT, };
 
 TARE_DEF size_t find_final_dot(const char *str, size_t len);
-TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build);
+TARE_DEF bool paths_from_tare(Paths *ps);
 
 TARE_DEF size_t get_current_time(void);
 TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject);
@@ -220,26 +232,26 @@ TARE_DEF size_t find_final_dot(const char *str, size_t len) {
   return result;
 }
 
-TARE_DEF bool paths_from_tare(const char *p, Paths *ps, StringView build) {
-  ps->path = p;
-  const char *path = p + ps->src.l;
-  size_t final_dot = find_final_dot(p, strlen(p)) - ps->src.l;
-
-  if (final_dot == 0) return false;
-  if (!append_to_string(&ps->arena, "./", 2)) return false;
-  ps->fasm_input = ps->arena.items + ps->arena.count;
-  ps->output = ps->arena.items + ps->arena.count;
-  if (!append_to_string(&ps->arena, build.s, build.l)) return false;
-  if (!append_to_string(&ps->arena, path, final_dot)) return false;
+TARE_DEF bool paths_from_tare(Paths *ps) {
+  if (ps->output != NULL) {
+    if (!append_to_string(&ps->arena, ps->output, strlen(ps->output)))
+      return false;
+    ps->fasm_input = ps->arena.items;
+  } else {
+    size_t final_dot = find_final_dot(ps->input, strlen(ps->input));
+    if (!append_to_string(&ps->arena, ps->input, final_dot))
+      return false;
+    ps->output = ps->arena.items;
+    da_append(&ps->arena, 0);
+    ps->fasm_input = ps->arena.items + ps->arena.count;
+    if (!append_to_string(&ps->arena, ps->input, final_dot))
+      return false;
+  }
   if (!append_to_string(&ps->arena, ".s", 2)) return false;
   da_append(&ps->arena, 0);
-
-  ps->output_bin = ps->arena.items + ps->arena.count;
-  if (!append_to_string(&ps->arena, "./", 2)) return false;
-  if (!append_to_string(&ps->arena, build.s, build.l)) return false;
-  if (!append_to_string(&ps->arena, path, final_dot)) return false;
-  da_append(&ps->arena, 0);
-
+  assert(ps->input != NULL && "unreachable");
+  assert(ps->output != NULL && "unreachable");
+  assert(ps->fasm_input != NULL && "unreachable");
   return true;
 }
 
@@ -253,7 +265,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) 
   printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
 }
 
-static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   int ret = 0;
   ThoroughTimer tokenization_timer = { .best = 1 };
@@ -270,7 +282,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   for (size_t counter = 0; counter < count; counter++) {
     Tokenizer t = {0};
     size_t start = get_current_time();
-    if (!tokenize_file(paths.path, &t)) return 1;
+    if (!tokenize_file(paths.input, &t)) return 1;
     size_t end = get_current_time();
     if (time_tokenization.value.on) time_current_action(&tokenization_timer, start, end);
 
@@ -336,7 +348,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
           .local_var_tape_size = local_var_tape_size.value.u64,
         };
         if (time_codegen.value.on) start = get_current_time();
-        if (!gen_fasm(paths.output, &gen)) return 1;
+        if (!gen_fasm(paths.fasm_input, &gen)) return 1;
         if (time_codegen.value.on) end = get_current_time();
         if (time_codegen.value.on) time_current_action(&codegen_timer, start, end);
 
@@ -377,7 +389,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
           .addrs = &addrs,
           .longs_locations = &longs_locations,
         };
-        if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
+        if (!gen_elf(paths.output, &binary_generator)) return 1;
         if (time_binary.value.on) end = get_current_time();
         if (time_binary.value.on) time_current_action(&bin_timer, start, end);
 
@@ -391,11 +403,11 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
       if (longs.items) free(longs.items);
 
       if (comp.value.on || compile_binary.value.on) {
-        cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+        cmd_append(&cmd, "chmod", "+x", paths.output);
         if (!run_cmd(&cmd, redirect, display)) return 1;
       }
       if (run.value.on) {
-        cmd_append(&cmd, paths.output_bin);
+        cmd_append(&cmd, paths.output);
         if (!run_cmd(&cmd, redirect, display)) return 1;
       }
 
@@ -439,13 +451,13 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   return ret;
 }
 
-static_assert(TARE_FLAGS_COUNT == 18, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_once(Paths paths) {
   int ret = 0;
 
   Tokenizer t = {0};
   size_t start = get_current_time();
-  if (!tokenize_file(paths.path, &t)) return 1;
+  if (!tokenize_file(paths.input, &t)) return 1;
   size_t end = get_current_time();
   if (time_tokenization.value.on) print_elapsed_time(start, end, "Tokenization");
 
@@ -512,7 +524,7 @@ TARE_DEF int comp_or_sim_once(Paths paths) {
         .local_var_tape_size = local_var_tape_size.value.u64,
       };
       if (time_codegen.value.on) start = get_current_time();
-      if (!gen_fasm(paths.output, &gen)) return 1;
+      if (!gen_fasm(paths.fasm_input, &gen)) return 1;
       if (time_codegen.value.on) end = get_current_time();
       if (time_codegen.value.on) print_elapsed_time(start, end, "Codegen");
 
@@ -552,7 +564,7 @@ TARE_DEF int comp_or_sim_once(Paths paths) {
         .addrs = &addrs,
         .longs_locations = &longs_locations,
       };
-      if (!gen_elf(paths.output_bin, &binary_generator)) return 1;
+      if (!gen_elf(paths.output, &binary_generator)) return 1;
       if (time_binary.value.on) end = get_current_time();
       if (time_binary.value.on) print_elapsed_time(start, end, "Binary");
 
@@ -566,11 +578,11 @@ TARE_DEF int comp_or_sim_once(Paths paths) {
     if (longs.items) free(longs.items);
 
     if (comp.value.on || compile_binary.value.on) {
-      cmd_append(&cmd, "chmod", "+x", paths.output_bin);
+      cmd_append(&cmd, "chmod", "+x", paths.output);
       if (!run_cmd(&cmd, redirect, display)) return 1;
     }
     if (run.value.on) {
-      cmd_append(&cmd, paths.output_bin);
+      cmd_append(&cmd, paths.output);
       if (!run_cmd(&cmd, redirect, display)) return 1;
     }
   }

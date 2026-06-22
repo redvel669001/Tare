@@ -5,32 +5,24 @@ TARE_DEF void str_to_tare_template(const char *string); // Testing thing
 
 int main(int argc, char **argv) {
   int ret = 0;
-
-  StringView src = SV_MAKE(./examples/);
-
   const char *program = *argv;
-
-  argc--;
-  argv++;
-  
-  const char *path_plain = *argv;
 
   Args args = { .args = (const char**) argv, .args_count = (size_t) argc };
   if (!parse_flags(&args, &flags)) {
     if (args.arg != NULL)
       fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
-    print_usage(stderr, program, "<input> ", flags);
+    print_usage(stderr, program, flags);
     return 1;
   }
 
   if (argc < 1) {
     fprintf(stderr, "Error: input `tare` file not provided!\n");
-    print_usage(stderr, program, "<input> ", flags);
+    print_usage(stderr, program, flags);
     return 1;
   }
   
   if (help.value.on) {
-    print_usage(stdout, program, "<input> ", flags);
+    print_usage(stdout, program, flags);
     return 0;
   }
 
@@ -56,11 +48,11 @@ int main(int argc, char **argv) {
     if (sim.value.on) time_simulator.value.on = true;
   }
 
-  const char *path = path_plain;
-
-  Paths paths = {.src = src};
-  StringView build = SV_MAKE(build/);
-  if (!paths_from_tare(path, &paths, build)) return 1;
+  Paths paths = {
+    .input = input.value.str,
+    .output = output.value.str,
+  };
+  if (!paths_from_tare(&paths)) return 1;
 
   if (time_thoroughly.parsed) ret = comp_or_sim_multiple_times(paths);
   else ret = comp_or_sim_once(paths);

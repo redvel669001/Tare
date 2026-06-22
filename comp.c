@@ -111,12 +111,12 @@ int main(int argc, char **argv) {
   if (!parse_flags(&args, &flags)) {
     if (args.arg != NULL)
       fprintf(stderr, "Error: incorrect usage of `%s` flag!\n", args.arg);
-    print_usage(stderr, bin_path, "", flags);
+    print_usage(stderr, bin_path, flags);
     return 1;
   }
 
   if (help.value.on) {
-    print_usage(stdout, bin_path, "", flags);
+    print_usage(stdout, bin_path, flags);
     return 0;
   }
 
@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
   } else {
     if (profile.value.on)
       cmd_append(&cmd, "valgrind", "--leak-check=full", "-s");
-    cmd_append(&cmd, "./tare", "./examples/fib.tare", "-h");
+    cmd_append(&cmd, "./tare", "-h");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
   
