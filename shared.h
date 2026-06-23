@@ -147,8 +147,8 @@ Flag time_thoroughly = {
   .default_value.u64 = 1,
 };
 Flag tape_size = {
-  .name_short = "-ts", .name_long = "--tape-size",
-  .description = "specify the size of the tape (in bytes).",
+  .name_short = "-tts", .name_long = "--tare-tape-size",
+  .description = "specify the size of the main (tare) tape (in bytes).",
   .type = FLAG_TYPE_U64,
   .default_value.u64 = TAPE_SIZE,
 };
