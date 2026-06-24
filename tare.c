@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
     print_usage(stderr, program, flags);
     return 1;
   }
-  
+
   if (help.value.on) {
     print_usage(stdout, program, flags);
     return 0;
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 TARE_DEF void str_to_tare_template(const char *string) {
   size_t len = strlen(string);
   printf("len = %zu\n", len);
-  
+
   const char *test_str = malloc(len);
   for (size_t i = 0; i < len;) {
     if (i + 8 <= len) {
@@ -90,4 +90,3 @@ TARE_DEF void str_to_tare_template(const char *string) {
     }
   }
 }
-

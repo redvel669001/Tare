@@ -112,30 +112,30 @@ typedef enum {
   KEY_S,
   KEY_I,
   KEY_D,
-  
+
   KEY_R8,
   KEY_R16,
   KEY_R32,
   KEY_R64,
-  
+
   KEY_IF,
   KEY_WHILE,
   KEY_BREAK,
   KEY_CONT,
-  
+
   KEY_FUNC,
   KEY_RET,
-  
+
   KEY_WRITE,
   KEY_READ,
   KEY_SYSCALL,
-  
+
   KEY_TAPE,
   KEY_HEAD,
   KEY_BASE,
   KEY_INDEX,
   KEY_LENGTH,
-  
+
   KEY_CONST,
 
   KEY_PUSH,
@@ -153,16 +153,16 @@ typedef enum {
   KEY_BITWISE_OR,
   KEY_LOGICAL_AND,
   KEY_LOGICAL_OR,
-  
+
   KEY_LESS,
   KEY_LESS_EQUAL,
   KEY_GREATER,
   KEY_GREATER_EQUAL,
   KEY_EQUAL,
   KEY_NOT_EQUAL,
-  
+
   KEY_DEREF,
-  
+
   KEYWORD_TYPES,
 } KeywordType;
 
@@ -176,35 +176,35 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_S]             = SV_MAKE(s),
   [KEY_I]             = SV_MAKE(i),
   [KEY_D]             = SV_MAKE(d),
-  
+
   [KEY_R8]            = SV_MAKE(r8),
   [KEY_R16]           = SV_MAKE(r16),
   [KEY_R32]           = SV_MAKE(r32),
   [KEY_R64]           = SV_MAKE(r64),
-  
+
   [KEY_IF]            = SV_MAKE(if),
   [KEY_WHILE]         = SV_MAKE(while),
   [KEY_BREAK]         = SV_MAKE(break),
   [KEY_CONT]          = SV_MAKE(continue),
-  
+
   [KEY_FUNC]          = SV_MAKE(func),
   [KEY_RET]           = SV_MAKE(ret),
-  
+
   [KEY_WRITE]         = SV_MAKE(write),
   [KEY_READ]          = SV_MAKE(read),
   [KEY_SYSCALL]       = SV_MAKE(syscall),
-  
+
   [KEY_TAPE]          = SV_MAKE(tape),
   [KEY_HEAD]          = SV_MAKE(head),
   [KEY_BASE]          = SV_MAKE(base),
   [KEY_INDEX]         = SV_MAKE(index),
   [KEY_LENGTH]        = SV_MAKE(length),
-  
+
   [KEY_CONST]         = SV_MAKE(const),
-  
+
   [KEY_PUSH]          = SV_MAKE(push),
   [KEY_POP]           = SV_MAKE(pop),
-  
+
   [KEY_ADD]           = SV_MAKE(add),
   [KEY_SUB]           = SV_MAKE(sub),
   [KEY_MUL]           = SV_MAKE(mul),
@@ -217,14 +217,14 @@ StringView Keywords[KEYWORD_TYPES] = {
   [KEY_BITWISE_OR]    = SV_MAKE(bitor),
   [KEY_LOGICAL_AND]   = SV_MAKE(logand),
   [KEY_LOGICAL_OR]    = SV_MAKE(logor),
-  
+
   [KEY_LESS]          = SV_MAKE(less),
   [KEY_LESS_EQUAL]    = SV_MAKE(lequal),
   [KEY_GREATER]       = SV_MAKE(greater),
   [KEY_GREATER_EQUAL] = SV_MAKE(gequal),
   [KEY_EQUAL]         = SV_MAKE(equal),
   [KEY_NOT_EQUAL]     = SV_MAKE(nequal),
-  
+
   [KEY_DEREF]         = SV_MAKE(deref),
 };
 
@@ -297,12 +297,12 @@ typedef enum {
   TOKEN_TYPE_SPECIAL,
   TOKEN_TYPE_STRING,
   TOKEN_TYPE_CHAR,
-  
+
   TOKEN_TYPE_GVID,
   TOKEN_TYPE_LVID,
   TOKEN_TYPE_RVID,
   TOKEN_TYPE_AVID,
-  
+
   TOKEN_TYPE_TID,
   TOKEN_TYPE_FID,
   TOKEN_TYPES,
@@ -317,13 +317,12 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
   [TOKEN_TYPE_SPECIAL] = "special",
   [TOKEN_TYPE_STRING] = "string literal",
   [TOKEN_TYPE_CHAR] = "character literal",
-  
-  
+
   [TOKEN_TYPE_GVID] = "global variable identifier",
   [TOKEN_TYPE_LVID] = "local variable identifier",
   [TOKEN_TYPE_RVID] = "return value identifier",
   [TOKEN_TYPE_AVID] = "function argument identifier",
-  
+
   [TOKEN_TYPE_TID] = "type identifier",
   [TOKEN_TYPE_FID] = "function identifier",
 };
@@ -334,7 +333,10 @@ const char *TokenTypeNames[TOKEN_TYPES] = {
 // --------------------------- LOC STRUCT: ---------------------------
 // -------------------------------------------------------------------
 //
-// The `Loc` struct is used for diagnostics. Since reporting doesn't need to happen very frequently, there's no need to bload the `Token` struct with 16 additional bytes. Rather, the location can be calculated, when necessary, by the 
+// The `Loc` struct is used for diagnostics. Since reporting doesn't
+// need to happen very frequently, there's no need to bload the
+// `Token` struct with 16 additional bytes. Rather, the location can
+// be calculated, when necessary, by the
 
 typedef struct {
   size_t row; // The line at which a token starts.
@@ -354,7 +356,7 @@ typedef struct {
 static_assert(TOKEN_TYPES == 13, "Amount of token types has changed. Please make sure the `Token` struct is working as intended.");
 typedef struct {
   TokenType t;     // The token's type.
-  
+
   union {          // This is here because to make padding unnecessary.
     SpecialType s; // The token's index as a special character.
     KeywordType k; // The token's index as a keyword.
@@ -791,7 +793,7 @@ TARE_DEF bool fill_tokenizer(Tokenizer *t) {
   first_char(&t->l); // Just in case.
   do { // Do while cause it fits this use case.
     if (isspace(*t->l.c)) continue; // Skip whitespace.
-    
+
     // Token still mostly zero-initialized, but with some fields
     // filled in to avoid needless repetition.
     Token tok = {.f = t->l.c, .l = 1, .s = special_index(*t->l.c)};
@@ -965,7 +967,7 @@ TARE_DEF void debug_print_token(const Tokenizer *t, const Token *tok) {
   case TOKEN_TYPE_SPECIAL: printf("(special) %.*s\n", TOK_ARG(tok)); break;
   case TOKEN_TYPE_STRING: printf("(string) %.*s\n", TOK_ARG(tok)); break;
   case TOKEN_TYPE_CHAR: printf("(char) %.*s\n", TOK_ARG(tok)); break;
-    
+
   case TOKEN_TYPE_GVID:
     printf("(gvid) %.*s (%zu)\n", TOK_ARG(tok), tok->gvid); break;
   case TOKEN_TYPE_LVID:
@@ -974,7 +976,7 @@ TARE_DEF void debug_print_token(const Tokenizer *t, const Token *tok) {
     printf("(rvid) %.*s (%zu)\n", TOK_ARG(tok), tok->rvid); break;
   case TOKEN_TYPE_AVID:
     printf("(avid) %.*s (%zu)\n", TOK_ARG(tok), tok->avid); break;
-    
+
   case TOKEN_TYPE_TID:
     printf("(tid) %.*s (%zu)\n", TOK_ARG(tok), tok->tid); break;
   case TOKEN_TYPE_FID:
@@ -1103,7 +1105,7 @@ TARE_DEF bool expect_special_many_function(Tokenizer *t, ...) {
   size_t count = 0;
   va_list args;
   va_start(args, t);
-  
+
   SpecialType s = va_arg(args, SpecialType);
 
   while (s < SPECIAL_TYPES) {
@@ -1131,7 +1133,7 @@ TARE_DEF bool expect_special_many_function(Tokenizer *t, ...) {
   }
   fprintf(stderr, "but got %s `%.*s` instead.\n",
           TokenTypeNames[t->t->t], TOK_ARG(t->t));
-  
+
   return false;
 }
 
@@ -1139,7 +1141,7 @@ TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...) {
   size_t count = 0;
   va_list args;
   va_start(args, t);
-  
+
   while (va_arg(args, SpecialType) < SPECIAL_TYPES) count++;
 
   va_end(args);
@@ -1161,9 +1163,9 @@ TARE_DEF bool expect_special_sequence_function(Tokenizer *t, ...) {
 
   va_end(args);
   va_start(args, t);
-  
+
   s = va_arg(args, SpecialType);
-  
+
   diag_err(t, begin, "expected ");
   for (size_t i = 0; i < count; i++) {
     const char ch = Specials[s];
@@ -1208,10 +1210,9 @@ TARE_DEF bool expect_tid_or_const(Tokenizer *t) {
 
   if (t->t->t == TOKEN_TYPE_TID) return true;
   if (t->t->k == KEY_CONST) return true;
-  
+
   diag_errf(t, t->t, "expected type identifier or keyword `%.*s` but got %.*s instead\n", SV_ARG(Keywords[KEY_CONST]), TOK_ARG(t->t));
   return false;
 }
 
 #endif // TOKENIZER_IMPLEMENTATION
-

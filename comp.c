@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
     .name_short = "-h", .name_long = "--help",
     .description = "present this infromation.",
   };
-  
+
   static_assert(FLAGS_COUNT == 10, "Flags count has been chagned. Please update the array to match the new count.");
   Flag *flag_array[FLAGS_COUNT] = {
     [FLAG_FAST] = &fast,
@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
     if (debug.value.on) cmd_append(&cmd, "-ggdb");
     if (analyze.value.on) cmd_append(&cmd, "-fanalyzer");
     if (!run_cmd(&cmd, redirect, true)) return 1;
-    
+
     if (rebuild.value.on) rebuild.value.on = false;
     no_rebuild.value.on = true;
     cmd_append(&cmd, bin_path);
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
     if (!run_cmd(&cmd, redirect, true)) return 1;
     return 0;
   }
-  
+
 #define SOURCES_COUNT 2
 #define PROGRAMS_COUNT 2
 
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
     TARE_SOURCE_SHARED_H,
     TARE_SOURCES,
   };
-  
+
   enum {
     TEST_SOURCE_TEST_C = 0,
     TEST_SOURCE_CMD_H,
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
     TEST_SOURCE_SHARED_H,
     TEST_SOURCES,
   };
-  
+
   static_assert(SOURCES_COUNT == PROGRAMS_COUNT);
   const char *tare_sources[TARE_SOURCES] = {
     [TARE_SOURCE_TARE_C] = "./tare.c",
@@ -232,13 +232,13 @@ int main(int argc, char **argv) {
   assert(tare_sources_count == TARE_SOURCES);
   assert(test_sources_count == TEST_SOURCES);
   size_t sources_counts[2] = {tare_sources_count, test_sources_count};
-  
+
   const char **sources_multi[SOURCES_COUNT] = {tare_sources, test_sources};
   const char *programs[PROGRAMS_COUNT] = {"tare", "test"};
 
   for (size_t i = 0; i < SOURCES_COUNT; i++) {
     const char *program = programs[i];
-    
+
     const char **sources = sources_multi[i];
     const char *source = sources[0];
     size_t sources_count = sources_counts[i];
@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
     cmd_append(&cmd, "./tare", "-h");
     if (!run_cmd(&cmd, redirect, true)) return 1;
   }
-  
+
   return 0;
 }
 
@@ -343,7 +343,7 @@ TARE_DEF bool needs_rebuild(const char *program, const char *source) {
 TARE_DEF bool needs_rebuild_multi(const char *program, const char **sources, size_t sources_count) {
   double source_modified = 0;
   struct stat source_statbuf = {0};
-  
+
   for (size_t i = 0; i < sources_count; i++) {
     if (!get_file_time(sources[i], &source_statbuf)) exit(1);
     double last_modified = timespec_to_double(source_statbuf.st_mtim);
@@ -379,4 +379,3 @@ TARE_DEF double timespec_to_double(struct timespec tm) {
 TARE_DEF double get_stat_time(const struct stat *statbuf) {
   return timespec_to_double(statbuf->st_mtim);
 }
-

@@ -210,13 +210,13 @@ TARE_DEF bool gen_ret_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_write_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_read_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_syscall_op_bin(BinaryGenerator *b);
-  
+
 TARE_DEF bool gen_tape_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_head_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_base_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_index_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_length_op_bin(BinaryGenerator *b);
-    
+
 TARE_DEF bool gen_push_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_pop_op_bin(BinaryGenerator *b);
 
@@ -228,7 +228,7 @@ TARE_DEF bool gen_mod_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_shl_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_shr_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_not_op_bin(BinaryGenerator *b);
-    
+
 TARE_DEF bool gen_comparison_op_bin(BinaryGenerator *b);
 TARE_DEF bool gen_bitwise_bin(BinaryGenerator *b);
 TARE_DEF bool gen_logical_bin(BinaryGenerator *b);
@@ -1303,7 +1303,7 @@ TARE_DEF bool gen_mov_word_deref_r64_imm16(BinaryGenerator *b, Reg64 r64, size_t
   case R15: if (!append_to_string(s, "\x66\x41\xc7\x07", 4)) return false; break;
   case REG_64_COUNT: default: assert(false && "unreachable");
   }
-  if (!append_to_string(s, (const char *)&imm16, 2)) return false; 
+  if (!append_to_string(s, (const char *)&imm16, 2)) return false;
   return true;
 }
 
@@ -2202,7 +2202,7 @@ TARE_DEF bool gen_cmp_r16_imm16(BinaryGenerator *b, Reg16 r16, size_t imm16) {
   case R15W: if (!append_to_string(s, "\x66\x41\x81\xff", 4)) return false; break;
   case REG_16_COUNT: default: assert(false && "unreachable");
   }
-  if (!append_to_string(s, (const char *)&imm16, 2)) return false; 
+  if (!append_to_string(s, (const char *)&imm16, 2)) return false;
   return true;
 }
 
@@ -2312,9 +2312,9 @@ TARE_DEF bool gen_funcall_bin(BinaryGenerator *b, size_t fid) {
   size_t args_fn = get_args_size(fn);
   size_t rets_fn = get_rets_size(fn);
   size_t lvars_fn = get_lvars_size(fn);
-  
+
   Function *fni = b->fns->items + b->fni;
-  
+
   size_t args_size = get_args_size(fni);
   size_t rets_size = get_rets_size(fni);
   size_t lvars_size = get_lvars_size(fni);
@@ -2333,7 +2333,7 @@ TARE_DEF bool gen_funcall_bin(BinaryGenerator *b, size_t fid) {
     if (!gen_mov_r64_qword_deref_m64_or_append_patch(b, RAX, &b->locals_head_location)) return false;
     if (!gen_add_r64_imm32(b, RAX, lvars_fn)) return false;
   }
-  
+
   for (size_t i = 0; i < fn->lvars.count; i++) {
     Var var = fn->lvars.items[i];
     switch (var.tid) {
@@ -2360,12 +2360,12 @@ TARE_DEF bool gen_funcall_bin(BinaryGenerator *b, size_t fid) {
     default: assert(false && "unimplemented");
     }
   }
-  
+
   if (args_fn > 0) {
     if (!gen_mov_r64_qword_deref_m64_or_append_patch(b, RAX, &b->args_head_location)) return false;
     if (!gen_add_r64_imm32(b, RAX, args_fn)) return false;
   }
-  
+
   for (size_t i = 0; i < fn->args.count; i++) {
     if (!gen_pop_r64(b, RBX)) return false;
     Var arg = fn->args.items[i];
@@ -2401,7 +2401,7 @@ TARE_DEF bool gen_funcall_bin(BinaryGenerator *b, size_t fid) {
     if (!gen_mov_r64_qword_deref_m64_or_append_patch(b, RAX, &b->rets_head_location)) return false;
     if (!gen_add_r64_imm32(b, RAX, rets_fn)) return false;
   }
-  
+
   if (args_size > 0) {
     if (!gen_sub_qword_deref_m64_imm32_or_append_patch(b, &b->args_head_location, args_size)) return false;
   }
@@ -2495,13 +2495,13 @@ TARE_DEF bool gen_op_binary(BinaryGenerator *b) {
   case OP_WRITE: if (!gen_write_op_bin(b)) return false; break;
   case OP_READ: if (!gen_read_op_bin(b)) return false; break;
   case OP_SYSCALL: if (!gen_syscall_op_bin(b)) return false; break;
-  
+
   case OP_TAPE: if (!gen_tape_op_bin(b)) return false; break;
   case OP_HEAD: if (!gen_head_op_bin(b)) return false; break;
   case OP_BASE: if (!gen_base_op_bin(b)) return false; break;
   case OP_INDEX: if (!gen_index_op_bin(b)) return false; break;
   case OP_LENGTH: if (!gen_length_op_bin(b)) return false; break;
-    
+
   case OP_CONST: UNIMPL("OP_CONST", false); break;
 
     // TODO: FIX `push` AND `pop`
@@ -2531,7 +2531,7 @@ TARE_DEF bool gen_op_binary(BinaryGenerator *b) {
   case OP_DEREF: if (!gen_deref_op_bin(b)) return false; break;
 
   case OP_NUM: if (!gen_num_op_bin(b)) return false; break;
-  
+
   case OP_POP_FROM_OPS: if (!gen_op_pop_from_ops_bin(b)) return false; break;
 
   case OP_ASSIGN: if (!gen_assign_op_bin(b)) return false; break;
@@ -2540,10 +2540,10 @@ TARE_DEF bool gen_op_binary(BinaryGenerator *b) {
   case OP_LVID: if (!gen_lvid_op_bin(b)) return false; break;
   case OP_RVID: if (!gen_rvid_op_bin(b)) return false; break;
   case OP_AVID: if (!gen_avid_op_bin(b)) return false; break;
-    
+
   case OP_TYPES: default: assert(false && "unreachable");
   }
-  
+
   return true;
 }
 
@@ -2771,7 +2771,7 @@ TARE_DEF bool gen_pop_op_bin(BinaryGenerator *b) {
 TARE_DEF bool gen_add_op_bin(BinaryGenerator *b) {
   // Second argument
   if (!gen_pop_r64(b, RBX)) return false;
-  
+
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
 
@@ -2783,7 +2783,7 @@ TARE_DEF bool gen_add_op_bin(BinaryGenerator *b) {
 TARE_DEF bool gen_sub_op_bin(BinaryGenerator *b) {
   // Second argument
   if (!gen_pop_r64(b, RBX)) return false;
-  
+
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
 
@@ -2810,7 +2810,7 @@ TARE_DEF bool gen_div_op_bin(BinaryGenerator *b) {
 
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
-  
+
   if (!gen_xor_r64_self(b, RDX)) return false;
   if (!gen_div_r64(b, RBX)) return false;
   if (!gen_push_r64(b, RAX)) return false;
@@ -2823,7 +2823,7 @@ TARE_DEF bool gen_mod_op_bin(BinaryGenerator *b) {
 
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
-  
+
   if (!gen_xor_r64_self(b, RDX)) return false;
   if (!gen_div_r64(b, RBX)) return false;
   if (!gen_push_r64(b, RDX)) return false;
@@ -2834,7 +2834,7 @@ TARE_DEF bool gen_shl_op_bin(BinaryGenerator *b) {
   // Second argument
   if (!gen_pop_r64(b, RAX)) return false;
   if (!gen_mov_cl_r8(b, AL)) return false;
-  
+
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
 
@@ -2847,7 +2847,7 @@ TARE_DEF bool gen_shr_op_bin(BinaryGenerator *b) {
   // Second argument
   if (!gen_pop_r64(b, RAX)) return false;
   if (!gen_mov_cl_r8(b, AL)) return false;
-  
+
   // First argument
   if (!gen_pop_r64(b, RAX)) return false;
 
@@ -3112,7 +3112,7 @@ TARE_DEF void patch_binary(BinaryGenerator *b) {
     case PATCH_TYPE_VIRTUAL: value += 0x4000e8; break;
     case PATCH_TYPES: default: assert(false && "unreachable"); break;
     }
-    
+
     switch (patch.size) {
     case 4:
       *(unsigned int *) location = (unsigned int) value;

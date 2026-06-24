@@ -80,11 +80,13 @@ typedef enum {
   TARE_FLAG_RET_TAPE_SIZE,
   TARE_FLAG_GLOBAL_VAR_TAPE_SIZE,
   TARE_FLAG_LOCAL_VAR_TAPE_SIZE,
+  TARE_FLAG_NOISY_CODEGEN,
+  TARE_FLAG_VERBOSE_CODEGEN,
   TARE_FLAG_HELP,
   TARE_FLAGS_COUNT,
 } TareFlag;
 
-static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 22, "Flags count has been chagned. Please update the flags to match the new count.");
 Flag input = {
   .name_short = "-i", .name_long = "--input",
   .description = "input file path.",
@@ -176,12 +178,20 @@ Flag local_var_tape_size = {
   .type = FLAG_TYPE_U64,
   .default_value.u64 = LOCAL_VAR_TAPE_SIZE,
 };
+Flag noisy_codegen = {
+  .name_short = "-nc", .name_long = "--noisy-codegen",
+  .description = "add source code location comments when generating fasm.",
+};
+Flag verbose_codegen = {
+  .name_short = "-vc", .name_long = "--verbose-codegen",
+  .description = "add comments when generating fasm to explain things.",
+};
 Flag help = {
   .name_short = "-h", .name_long = "--help",
   .description = "present this infromation.",
 };
 
-static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the array to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 22, "Flags count has been chagned. Please update the array to match the new count.");
 Flag *flag_array[TARE_FLAGS_COUNT] = {
   [TARE_FLAG_INPUT] = &input,
   [TARE_FLAG_OUTPUT] = &output,
@@ -202,6 +212,8 @@ Flag *flag_array[TARE_FLAGS_COUNT] = {
   [TARE_FLAG_RET_TAPE_SIZE] = &ret_tape_size,
   [TARE_FLAG_GLOBAL_VAR_TAPE_SIZE] = &global_var_tape_size,
   [TARE_FLAG_LOCAL_VAR_TAPE_SIZE] = &local_var_tape_size,
+  [TARE_FLAG_NOISY_CODEGEN] = &noisy_codegen,
+  [TARE_FLAG_VERBOSE_CODEGEN] = &verbose_codegen,
   [TARE_FLAG_HELP] = &help,
 };
 
@@ -265,7 +277,7 @@ TARE_DEF void print_elapsed_time(size_t start, size_t end, const char *subject) 
   printf("\n%s: %lf\n", subject, ((double) end - start) / 1000000000);
 }
 
-static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 22, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   int ret = 0;
   ThoroughTimer tokenization_timer = { .best = 1 };
@@ -451,7 +463,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
   return ret;
 }
 
-static_assert(TARE_FLAGS_COUNT == 20, "Flags count has been chagned. Please update the flags to match the new count.");
+static_assert(TARE_FLAGS_COUNT == 22, "Flags count has been chagned. Please update the flags to match the new count.");
 TARE_DEF int comp_or_sim_once(Paths paths) {
   int ret = 0;
 
@@ -622,4 +634,3 @@ TARE_DEF void print_thorough_timer(ThoroughTimer timer, size_t count, const char
 }
 
 #endif // SHARED_IMPLEMENTATION
-

@@ -130,9 +130,8 @@ TARE_DEF bool run_cmd_function(Cmd *cmd, Redirect redirect, bool display) {
     close(*redirect.fderr);
     *redirect.fderr = -1;
   }
-  
+
   return true;
 }
 
 #endif // CMD_IMPLEMENTATION
-

@@ -46,7 +46,7 @@ TARE_DEF bool read_file(const char *path, String *buf) {
     fclose(f);
     return false;
   }
-  
+
   long file_size = ftell(f);
   if (file_size == -1) {
     fprintf(stderr, "error: Could not measure size of file `%s`.\n", path);
@@ -60,14 +60,14 @@ TARE_DEF bool read_file(const char *path, String *buf) {
     fclose(f);
     return false;
   }
-  
+
   buf->capacity = file_size;
   fseek(f, 0, SEEK_SET);
   if (fread(buf->items, file_size, 1, f) == 0) {
     fprintf(stderr, "error: Could not read file `%s`. It there was an error, or the file was empty.\n", path);
   }
   buf->count = buf->capacity;
-  
+
   fclose(f);
   return true;
 }

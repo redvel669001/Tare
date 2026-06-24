@@ -6,7 +6,7 @@
 typedef struct {
   char *items;
   size_t count, capacity;
-  
+
   size_t index;
   char *c;
 } Lexer;

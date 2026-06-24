@@ -171,7 +171,7 @@ TARE_DEF void print_usage(FILE *out, const char *program, Flags flags) {
   size_t name_short_max_pad = max_pad_from_max_length(name_short_max_length);
   size_t name_long_max_pad = max_pad_from_max_length(name_long_max_length);
   size_t description_max_pad = max_pad_from_max_length(description_max_length);
-  
+
   for (size_t i = 0; i < flags.count; i++) {
     Flag *flag = flags.items[i];
     size_t name_short_pad = name_short_max_pad - strlen(flag->name_short);

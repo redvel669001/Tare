@@ -70,7 +70,7 @@ TARE_DEF int sim_tare(Simulator *sim) {
   if (sim == NULL) return -1;
 
   if (!sim_funcall(sim, 0)) return -1;
-  
+
   int ret = 0;
 
   if (sim->fni != 0) return -1;
@@ -84,7 +84,7 @@ TARE_DEF int sim_tare(Simulator *sim) {
     size_t num = sim->stack->items[i];
     printf("stack[%zu] = %zu\n", i, num);
   }
-  
+
   if (sim->stack->count == 0) return ret;
   return -1;
 }
@@ -119,7 +119,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
 
   Longs *stack = sim->stack;
   Longs *addrs = &sim->addrs;
-  
+
   switch (op->type) {
   case OP_PTR_ADD:
   case OP_PTR_SUB:
@@ -207,13 +207,13 @@ TARE_DEF bool sim_op(Simulator *sim) {
       }
     }
     break;
-  
+
   case OP_TAPE: da_append(stack, value); break;
   case OP_HEAD: da_append(stack, tape->head); break;
   case OP_BASE: da_append(stack, tape->base); break;
   case OP_INDEX: da_append(stack, tape->head - tape->base); break;
   case OP_LENGTH: da_append(stack, tape->capacity); break;
-  
+
   case OP_CONST: unimpl("OP_CONST"); break;
 
   case OP_PUSH: case OP_POP:
@@ -253,11 +253,11 @@ TARE_DEF bool sim_op(Simulator *sim) {
       else if (op->type ==  OP_LOGICAL_AND) val = first && second;
       else if (op->type ==  OP_LOGICAL_OR) val = first || second;
       else assert(false && "unreachable");
-      
+
       da_append(stack, val);
     }
     break;
-    
+
   case OP_NOT:
     {
       if (stack->count < 1) return false;
@@ -265,7 +265,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
       da_append(stack, !first);
     }
     break;
-  
+
   case OP_DEREF:
     {
       if (stack->count < 1) return false;
@@ -275,7 +275,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
       Vid vid = sim->vids->items[--sim->vids->count];
 
       const Var *var = NULL;
-      
+
       switch (vid.type) {
       case SCOPE_GLOBAL:
         if (vid.vid >= sim->global_vars->capacity) return false;
@@ -361,9 +361,9 @@ TARE_DEF bool sim_op(Simulator *sim) {
       size_t first = stack->items[--stack->count];
       char *item = (char *) first;
       Vid vid = sim->vids->items[--sim->vids->count];
-      
+
       const Var *var = NULL;
-      
+
       switch (vid.type) {
       case SCOPE_GLOBAL:
         if (vid.vid >= sim->global_vars->capacity) return false;
@@ -385,7 +385,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
       }
 
       if (var == NULL) return false;
-      
+
       switch (var->tid) {
       case TYPE_U8:
         *item = (unsigned char) second;
@@ -399,7 +399,7 @@ TARE_DEF bool sim_op(Simulator *sim) {
       case TYPE_U64:
         *((size_t *)item) = second;
         break;
-      case TYPES_COUNT: 
+      case TYPES_COUNT:
       default: assert(false && "unimplemented");
       }
     }
@@ -417,7 +417,7 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
   Longs *stack = sim->stack;
   size_t save = sim->opi;
   da_append(&sim->ret_addrs, sim->fni);
-  
+
   Function *fn = sim->fns->items + fid;
   size_t args_fn = get_args_size(fn);
   size_t rets_fn = get_rets_size(fn);
@@ -435,7 +435,7 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
   size_t lvars_head = sim->locals->head;
 
   lvars_head += lvars_fn;
-  
+
   for (size_t i = 0; i < fn->lvars.count; i++) {
     Var var = fn->lvars.items[i];
     switch (var.tid) {
@@ -462,11 +462,11 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
     default: assert(false && "unimplemented");
     }
   }
-  
+
   size_t args_head = sim->args->head;
-  
+
   args_head += args_fn;
-  
+
   for (size_t i = 0; i < fn->args.count; i++) {
     size_t argument = stack->items[--stack->count];
     Var arg = fn->args.items[i];
@@ -494,7 +494,7 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
     default: assert(false && "unimplemented");
     }
   }
-  
+
   sim->fni = fid;
   sim->fn = p->funcs->items + sim->fni;
   if (!(sim_func(sim))) return false;
@@ -506,7 +506,7 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
   sim->args->head -= args_size;
   sim->rets->head -= rets_size;
   sim->locals->head -= lvars_size;
-  
+
   for (size_t i = 0; i < fn->rets.count; i++) {
     size_t ret_val = 0;
     Var ret = fn->rets.items[i];
@@ -530,18 +530,18 @@ TARE_DEF bool sim_funcall(Simulator *sim, size_t fid) {
       rets_head -= 8;
       ret_val = *((size_t *) rets_head);
       break;
-    case TYPES_COUNT: 
+    case TYPES_COUNT:
     default: assert(false && "unimplemented");
     }
     da_append(stack, ret_val);
   }
-  
+
   return true;
 }
 
 TARE_DEF void read_from_tape(Simulator *sim) {
   TapeElement element = {0};
-  
+
   if (sim->r == 1) element.u8 = (unsigned char *) sim->tape->head;
   else if (sim->r == 2) element.u16 = (unsigned short *) sim->tape->head;
   else if (sim->r == 4) element.u32 = (unsigned int *) sim->tape->head;
@@ -557,7 +557,7 @@ TARE_DEF void read_from_tape(Simulator *sim) {
 
 TARE_DEF void write_to_tape(Simulator *sim, size_t value) {
   TapeElement element = sim->tape->value;
-  
+
   if (sim->r == 1) *element.u8 = (unsigned char) value;
   else if (sim->r == 2) *element.u16 = (unsigned short) value;
   else if (sim->r == 4) *element.u32 = (unsigned int) value;
