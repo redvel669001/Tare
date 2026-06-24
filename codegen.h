@@ -634,7 +634,7 @@ TARE_DEF void gen_push_op(Generator *g, FILE *f) {
 
   /* gen_pop_from_ops_to_reg(f, "rbx"); */
 
-  fprintf(f, "push QWORD [rbx]");
+  fprintf(f, "push QWORD [rbx]\n");
 
   (void)g;
 }
