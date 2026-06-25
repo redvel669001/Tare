@@ -347,7 +347,7 @@ TARE_DEF int comp_or_sim_multiple_times(Paths paths) {
       Redirect redirect = {0};
       bool display = false;
 
-      if (comp.value.on) {
+      if (comp.value.on || dump_asm.value.on) {
         Generator gen = {
           .longs = &longs, .t = &t,
           .fn = funcs.items, .op = funcs.items->items,
@@ -523,7 +523,7 @@ TARE_DEF int comp_or_sim_once(Paths paths) {
     Longs longs = {0};
     Redirect redirect = {0};
     bool display = false;
-    if (comp.value.on) {
+    if (comp.value.on || dump_asm.value.on) {
       Generator gen = {
         .longs = &longs, .t = &t,
         .fn = funcs.items, .op = funcs.items->items,
