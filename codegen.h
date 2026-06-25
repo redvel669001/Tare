@@ -723,7 +723,7 @@ TARE_DEF void gen_mod_op(FILE *f) {
 TARE_DEF void gen_shl_op(FILE *f) {
   // Second argument
   gen_pop_from_ops(f);
-  fprintf(f, "mov cl, al");
+  fprintf(f, "mov cl, al\n");
 
   // First argument
   gen_pop_from_ops(f);
@@ -735,7 +735,7 @@ TARE_DEF void gen_shl_op(FILE *f) {
 TARE_DEF void gen_shr_op(FILE *f) {
   // Second argument
   gen_pop_from_ops(f);
-  fprintf(f, "mov cl, al");
+  fprintf(f, "mov cl, al\n");
 
   // First argument
   gen_pop_from_ops(f);
@@ -770,7 +770,7 @@ TARE_DEF void gen_bitwise(Generator *g, FILE *f) {
   else if (g->op->type == OP_BITWISE_OR) inst = "or";
   else assert(false && "unreachable");
 
-  fprintf(f, "%s QWORD rax, QWORD rbx", inst);
+  fprintf(f, "%s QWORD rax, QWORD rbx\n", inst);
 
   gen_push_to_ops(f);
 }
